@@ -1,0 +1,16 @@
+{
+  "name": "@vfxcopilot/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "vfxcopilot": "./dist/bin/vfxcopilot.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx bin/vfxcopilot.ts"
+  },
+  "dependencies": {
+    "@vfxcopilot/shared": "*"
+  }
+}
