@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { PatchSchema } from "@vfxcopilot/shared";
+import { PatchSchema, type Patch } from "@vfxcopilot/shared";
 import { getStubPatch } from "../services/stub.js";
 
 interface GenerateBody {
@@ -10,6 +10,9 @@ interface GenerateBody {
   };
 }
 
+// Store latest patch for plugin polling
+let latestPatch: { patch: Patch; summary: string; warnings: string[] } | null = null;
+
 export async function generateRoute(app: FastifyInstance): Promise<void> {
   app.post<{ Body: GenerateBody }>("/generate", async (request) => {
     const { prompt } = request.body;
@@ -19,11 +22,24 @@ export async function generateRoute(app: FastifyInstance): Promise<void> {
     const patch = getStubPatch();
     const validated = PatchSchema.parse(patch);
 
+    latestPatch = {
+      patch: validated,
+      summary: validated.summary,
+      warnings: validated.warnings,
+    };
+
     return {
       patch: validated,
       summary: validated.summary,
       warnings: validated.warnings,
       estimatedObjects: validated.operations.length,
     };
+  });
+
+  app.get("/latest-patch", async () => {
+    if (!latestPatch) {
+      return { patch: null };
+    }
+    return latestPatch;
   });
 }
