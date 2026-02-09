@@ -1,5 +1,5 @@
 import type { SlashCommand } from "@vfxcopilot/shared";
-import { PatchSchema } from "@vfxcopilot/shared";
+import { PatchSchema, validatePatch } from "@vfxcopilot/shared";
 import { store } from "../state/store.js";
 import { generate as callGenerate } from "../backend/client.js";
 import { broadcast } from "../ui/ws-server.js";
@@ -30,6 +30,11 @@ export function createGenerateCommand(): SlashCommand {
           console.log(`  Warnings: ${patch.warnings.join(", ")}`);
         }
         console.log(`  Operations: ${patch.operations.length}`);
+
+        const validation = validatePatch(patch);
+        if (!validation.valid) {
+          console.log("  SAFETY: BLOCKED — use /preview to see errors.");
+        }
         console.log("  Use /preview to inspect, /apply to apply.\n");
 
         broadcast({

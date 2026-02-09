@@ -17,3 +17,5 @@ export {
   MAX_OPERATIONS,
   BLOCKED_LUA_PATTERNS,
 } from "./constants.js";
+export { validatePatch } from "./validation/safety.js";
+export type { ValidationResult } from "./validation/safety.js";
