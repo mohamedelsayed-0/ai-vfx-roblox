@@ -4,6 +4,8 @@ import { createExitCommand } from "./commands/exit.js";
 import { startRepl } from "./repl/repl.js";
 import { startWsServer, stopWsServer } from "./ui/ws-server.js";
 import { launchUI, killUI } from "./ui/launch.js";
+import { spawnBackend, killBackend } from "./backend/spawn.js";
+import { healthCheck } from "./backend/client.js";
 
 export async function main(): Promise<void> {
   const registry = new CommandRegistry();
@@ -13,6 +15,7 @@ export async function main(): Promise<void> {
   const cleanup = () => {
     rl?.close();
     killUI();
+    killBackend();
     stopWsServer();
   };
 
@@ -26,10 +29,28 @@ export async function main(): Promise<void> {
   console.log("  Type /help for available commands.");
   console.log();
 
+  // Start backend server
+  spawnBackend(3000);
+  console.log("  [Backend starting on :3000]");
+
+  // Wait for backend to be ready
+  let ready = false;
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (await healthCheck()) {
+      ready = true;
+      break;
+    }
+  }
+  if (ready) {
+    console.log("  [Backend ready]");
+  } else {
+    console.log("  [Backend failed to start — generation will not work]");
+  }
+
   // Start WebSocket server for UI sync
   const wss = startWsServer(3001);
   wss.on("connection", (ws) => {
-    // Send initial state to newly connected UI
     const commands = registry.getAll().map((c) => ({
       name: c.name,
       description: c.description,
