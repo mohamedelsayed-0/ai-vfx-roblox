@@ -11,6 +11,10 @@
     "dev": "tsx bin/vfxcopilot.ts"
   },
   "dependencies": {
-    "@vfxcopilot/shared": "*"
+    "@vfxcopilot/shared": "*",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   }
 }

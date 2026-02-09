@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VFX Copilot</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <header id="status-bar">
+      <span id="status-indicator" class="status-disconnected"></span>
+      <span id="status-text">Connecting...</span>
+    </header>
+
+    <main id="content">
+      <div id="welcome">
+        <h1>VFX Copilot</h1>
+        <p class="subtitle">AI-powered VFX for Roblox Studio</p>
+        <p class="hint">Type <code>/help</code> in the terminal or select a command below</p>
+      </div>
+
+      <div id="command-list">
+        <h2>Available Commands</h2>
+        <ul id="commands"></ul>
+      </div>
+
+      <div id="patch-area" class="hidden">
+        <h2>Current Patch</h2>
+        <div id="patch-summary"></div>
+      </div>
+    </main>
+  </div>
+  <script src="renderer.js"></script>
+</body>
+</html>
