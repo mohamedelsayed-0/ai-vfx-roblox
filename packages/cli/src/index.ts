@@ -1,6 +1,7 @@
 import { CommandRegistry } from "./commands/registry.js";
 import { createHelpCommand } from "./commands/help.js";
 import { createExitCommand } from "./commands/exit.js";
+import { createGenerateCommand } from "./commands/generate.js";
 import { startRepl } from "./repl/repl.js";
 import { startWsServer, stopWsServer } from "./ui/ws-server.js";
 import { launchUI, killUI } from "./ui/launch.js";
@@ -19,8 +20,9 @@ export async function main(): Promise<void> {
     stopWsServer();
   };
 
-  // Register base commands
+  // Register commands
   registry.register(createHelpCommand(registry));
+  registry.register(createGenerateCommand());
   registry.register(createExitCommand(cleanup));
 
   // Banner
