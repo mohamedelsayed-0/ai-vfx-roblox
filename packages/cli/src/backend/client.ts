@@ -29,7 +29,9 @@ export async function generate(
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) {
-    throw new Error(`Backend error: ${res.status} ${res.statusText}`);
+    const errorData = await res.json().catch(() => ({}));
+    const detail = (errorData as any).error || res.statusText;
+    throw new Error(`Backend error: ${res.status} ${detail}`);
   }
   return res.json() as Promise<GenerateResponse>;
 }
