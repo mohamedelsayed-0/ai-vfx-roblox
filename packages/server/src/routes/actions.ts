@@ -39,7 +39,10 @@ export async function actionsRoute(app: FastifyInstance): Promise<void> {
 
   app.get("/pending-action", async () => {
     const current = pendingAction;
-    pendingAction = { action: "none" };
+    if (current.action !== "none") {
+      console.log(`[Backend] Delivering action: ${current.action}`);
+      pendingAction = { action: "none" };
+    }
     return current;
   });
 

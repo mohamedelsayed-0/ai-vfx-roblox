@@ -96,22 +96,30 @@ function PatchApply.apply(patch)
 	return count
 end
 
-print("[VFX Copilot] Plugin active. Version 1.1")
+print("[VFX Copilot] Plugin active. Version 1.2")
 
 task.spawn(function()
-	local connected = false
+	local connected = nil -- Start as nil to force a print on first check
+	print("[VFX Copilot] Starting connection loop to: " .. Config.BackendUrl)
+	
 	while true do
 		local healthy = HttpClient.healthCheck()
+		
 		if healthy ~= connected then
 			connected = healthy
-			print(healthy and "🟢 [VFX Copilot] Connected!" or "🔴 [VFX Copilot] Backend Disconnected.")
+			if healthy then
+				print("🟢 [VFX Copilot] Connected to Backend!")
+			else
+				warn("🔴 [VFX Copilot] Backend Disconnected. (Ensure CLI is running at " .. Config.BackendUrl .. ")")
+			end
 		end
+		
 		if connected then
 			local action = HttpClient.getPendingAction()
 			if action and action.action == "apply" then
-				print("📦 [VFX Copilot] Applying: " .. (action.patch.effectName or "Effect"))
+				print("📦 [VFX Copilot] Received Patch: " .. (action.patch.effectName or "unnamed"))
 				local n = PatchApply.apply(action.patch)
-				warn("✅ [VFX Copilot] Created " .. n .. " objects.")
+				warn("✅ [VFX Copilot] Successfully created " .. n .. " objects.")
 				HttpClient.confirmAction()
 			end
 		end
