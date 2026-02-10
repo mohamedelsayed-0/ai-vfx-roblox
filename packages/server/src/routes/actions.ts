@@ -47,6 +47,7 @@ export async function actionsRoute(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/confirm-action", async () => {
+    pendingAction = { action: "none" };
     return { ok: true };
   });
 }

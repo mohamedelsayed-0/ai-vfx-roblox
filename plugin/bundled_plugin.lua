@@ -66,10 +66,14 @@ end
 
 function PatchApply.apply(patch)
 	local count = 0
+	local rootFolder = nil
+	local createdParts = {}
+
 	for _, op in ipairs(patch.operations) do
 		local success, err = pcall(function()
 			if op.op == "ensureFolder" then
-				resolveOrEnsure(op.path, true)
+				local folder = resolveOrEnsure(op.path, true)
+				if not rootFolder then rootFolder = folder end
 			elseif op.op == "createInstance" then
 				local parent = resolveOrEnsure(op.parentPath, true)
 				local inst = Instance.new(op.className)
@@ -78,6 +82,9 @@ function PatchApply.apply(patch)
 					pcall(function() inst[prop] = val end)
 				end
 				inst.Parent = parent
+				if inst:IsA("BasePart") or inst:IsA("Attachment") then
+					table.insert(createdParts, inst)
+				end
 				count = count + 1
 			elseif op.op == "createScript" then
 				local parts = string.split(op.path, "/")
@@ -93,6 +100,31 @@ function PatchApply.apply(patch)
 		end)
 		if not success then warn("[VFX Copilot] Error in op " .. op.op .. ": " .. tostring(err)) end
 	end
+
+	-- Move to camera view if in Workspace
+	if rootFolder and rootFolder:IsDescendantOf(workspace) then
+		local cam = workspace.CurrentCamera
+		if cam then
+			local targetPos = cam.CFrame.Position + (cam.CFrame.LookVector * 15)
+			if #createdParts > 0 then
+				local center = Vector3.new(0,0,0)
+				for _, p in ipairs(createdParts) do 
+					local pPos = p:IsA("BasePart") and p.Position or p.WorldPosition
+					center = center + pPos 
+				end
+				center = center / #createdParts
+				local offset = targetPos - center
+				for _, p in ipairs(createdParts) do 
+					if p:IsA("BasePart") then
+						p.Position = p.Position + offset 
+					else
+						p.WorldPosition = p.WorldPosition + offset
+					end
+				end
+			end
+		end
+	end
+
 	return count
 end
 
