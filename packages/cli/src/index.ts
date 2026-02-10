@@ -13,7 +13,26 @@ import { launchUI, killUI } from "./ui/launch.js";
 import { spawnBackend, killBackend } from "./backend/spawn.js";
 import { healthCheck } from "./backend/client.js";
 
+import { resolve } from "node:path";
+import { homedir } from "node:os";
+import { readFile } from "node:fs/promises";
+
+async function loadGeminiKey(): Promise<string | undefined> {
+  const configPath = resolve(homedir(), ".vfxcopilot", "config.json");
+  try {
+    const raw = await readFile(configPath, "utf-8");
+    const config = JSON.parse(raw);
+    return config.geminiApiKey;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function main(): Promise<void> {
+  const geminiKey = await loadGeminiKey();
+  if (geminiKey) {
+    process.env["GEMINI_API_KEY"] = geminiKey;
+  }
   const registry = new CommandRegistry();
 
   let rl: { close: () => void } | undefined;
