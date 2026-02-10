@@ -28,6 +28,22 @@ export async function generateWithGemini(
 
   const userPrompt = `${SYSTEM_PROMPT}\n\n${contextInfo}\n\nUser request: ${prompt}`;
 
+  const cleanJson = (text: string) => {
+    return text.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+  };
+
+  const attemptParse = (text: string) => {
+    const cleaned = cleanJson(text);
+    try {
+      const parsed = JSON.parse(cleaned);
+      return PatchSchema.parse(parsed);
+    } catch (err) {
+      console.error("[Gemini] Parse Error:", err instanceof Error ? err.message : String(err));
+      console.error("[Gemini] Raw Text Sample:", cleaned.slice(0, 100));
+      throw err;
+    }
+  };
+
   // First attempt
   console.log(`[Gemini] Generating with prompt length: ${userPrompt.length}`);
   const result = await model.generateContent(userPrompt);
@@ -35,21 +51,19 @@ export async function generateWithGemini(
   console.log(`[Gemini] Received response length: ${text.length}`);
 
   try {
-    const parsed = JSON.parse(text);
-    return PatchSchema.parse(parsed);
+    return attemptParse(text);
   } catch (firstError) {
+    console.warn("[Gemini] First attempt failed, retrying...");
     // Retry once with correction prompt
-    const retryPrompt = `${RETRY_PROMPT}\n\nOriginal request: ${prompt}`;
+    const retryPrompt = `${RETRY_PROMPT}\n\nOriginal request: ${prompt}\n\nError: ${firstError instanceof Error ? firstError.message : String(firstError)}`;
     const retryResult = await model.generateContent(retryPrompt);
     const retryText = retryResult.response.text();
 
     try {
-      const retryParsed = JSON.parse(retryText);
-      return PatchSchema.parse(retryParsed);
+      return attemptParse(retryText);
     } catch (secondError) {
-      throw new Error(
-        "AI returned invalid format after retry. Try rephrasing your prompt or use a preset.",
-      );
+      const msg = secondError instanceof Error ? secondError.message : String(secondError);
+      throw new Error(`AI returned invalid format after retry: ${msg}`);
     }
   }
 }
