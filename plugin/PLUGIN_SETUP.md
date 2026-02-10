@@ -11,27 +11,20 @@ The plugin needs to talk to the local backend server on `127.0.0.1:3000`.
 
 ## 2. Install the Plugin
 
-### Option A: Local Plugins Folder (Recommended)
+### Option A: Bundled Script (Easiest)
 
-1. In Roblox Studio, go to **Plugins** tab > **Plugins Folder** (this opens your local plugins directory)
-2. Create a new folder called `VFXCopilot` inside the plugins folder
-3. Copy these files from `plugin/src/` into the `VFXCopilot` folder:
-   - `init.server.lua`
-   - `PatchApply.lua`
-   - `HttpClient.lua`
-   - `Config.lua`
-4. Restart Roblox Studio — the plugin will auto-load
+1. In Roblox Studio, open the **Explorer** panel.
+2. Right-click **ServerStorage** > **Insert Object** > **Script**.
+3. Name the script `VFXCopilot`.
+4. Paste the entire contents of `plugin/bundled_plugin.lua` into this script.
+5. In the Properties window for the script, set **RunContext** to **Plugin**.
 
-### Option B: Manual Script in Studio
+### Option B: Local Plugins Folder
 
-1. In Roblox Studio, open the **Explorer** panel
-2. Right-click **ServerStorage** > **Insert Object** > **Folder** (name it `VFXCopilot`)
-3. Inside the folder, create 4 **ModuleScript** objects:
-   - `PatchApply` — paste contents of `plugin/src/PatchApply.lua`
-   - `HttpClient` — paste contents of `plugin/src/HttpClient.lua`
-   - `Config` — paste contents of `plugin/src/Config.lua`
-4. Create a **Script** (not ModuleScript) named `init` — paste contents of `plugin/src/init.server.lua`
-5. In the Script properties, set **RunContext** to **Plugin**
+1. In Roblox Studio, go to **Plugins** tab > **Plugins Folder**.
+2. Create a folder called `VFXCopilot`.
+3. Copy `plugin/bundled_plugin.lua` into that folder and rename it to `init.server.lua`.
+4. Restart Studio.
 
 ## 3. Verify Connection
 
