@@ -8,7 +8,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: #1a1a2e;
   color: #e0e0e0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 #app {
@@ -25,6 +25,7 @@ body {
   background: #16213e;
   border-bottom: 1px solid #0f3460;
   font-size: 13px;
+  flex-shrink: 0;
 }
 
 .status-disconnected::before,
@@ -43,36 +44,27 @@ body {
 
 #content {
   flex: 1;
-  padding: 24px;
+  padding: 16px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 #welcome {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 8px;
 }
 
 #welcome h1 {
-  font-size: 24px;
+  font-size: 20px;
   color: #e94560;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .subtitle {
   color: #8e8e8e;
-  margin-bottom: 16px;
-}
-
-.hint {
-  color: #6e6e8e;
   font-size: 13px;
-}
-
-.hint code {
-  background: #16213e;
-  padding: 2px 6px;
-  border-radius: 3px;
-  color: #e94560;
 }
 
 #command-list h2 {
@@ -80,7 +72,7 @@ body {
   color: #8e8e8e;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 #commands {
@@ -90,7 +82,7 @@ body {
 #commands li {
   display: flex;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s;
@@ -104,11 +96,12 @@ body {
   color: #e94560;
   font-family: monospace;
   font-weight: 600;
+  font-size: 13px;
 }
 
 #commands .cmd-desc {
   color: #8e8e8e;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .hidden {
@@ -120,14 +113,14 @@ body {
   color: #8e8e8e;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 #patch-summary {
   background: #16213e;
-  padding: 16px;
+  padding: 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -141,6 +134,83 @@ body {
   background: #0f3460;
   padding: 2px 8px;
   border-radius: 3px;
+}
+
+/* Output Log */
+#output-log {
+  flex: 1;
+  min-height: 80px;
+  background: #0d1117;
+  border-radius: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-entry {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-user {
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+.log-output {
+  color: #c9d1d9;
+}
+
+.log-error {
+  color: #f85149;
+}
+
+/* Command Bar */
+#command-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #16213e;
+  border-top: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+#command-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  background: #0d1117;
+  color: #e0e0e0;
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 13px;
+  outline: none;
+}
+
+#command-input:focus {
+  border-color: #e94560;
+}
+
+#command-input::placeholder {
+  color: #6e6e8e;
+}
+
+#send-btn {
+  padding: 8px 16px;
+  background: #e94560;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#send-btn:hover {
+  background: #d63851;
 }
 
 /* Command Palette */

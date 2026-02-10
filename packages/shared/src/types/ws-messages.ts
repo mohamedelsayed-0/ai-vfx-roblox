@@ -4,7 +4,8 @@ export type ServerMessage =
   | { type: "commandOutput"; command: string; output: string }
   | { type: "patchGenerated"; patch: unknown; summary: string; warnings: string[] }
   | { type: "patchApplied"; checkpointId: string }
-  | { type: "patchReverted"; checkpointId: string };
+  | { type: "patchReverted"; checkpointId: string }
+  | { type: "commandError"; message: string };
 
 export type ClientMessage =
   | { type: "command"; command: string }

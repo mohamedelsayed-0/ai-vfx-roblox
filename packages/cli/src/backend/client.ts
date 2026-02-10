@@ -33,3 +33,29 @@ export async function generate(
   }
   return res.json() as Promise<GenerateResponse>;
 }
+
+export async function applyPatch(
+  patch: unknown,
+  checkpointId: string,
+  createdPaths: string[],
+): Promise<void> {
+  try {
+    await fetch(`${BACKEND_URL}/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patch, checkpointId, createdPaths }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch { /* backend may be unavailable */ }
+}
+
+export async function revertPatch(paths: string[]): Promise<void> {
+  try {
+    await fetch(`${BACKEND_URL}/revert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paths }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch { /* backend may be unavailable */ }
+}

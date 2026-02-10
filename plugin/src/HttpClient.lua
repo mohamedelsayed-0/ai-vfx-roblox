@@ -60,4 +60,30 @@ function HttpClient.getLatestPatch()
 	return nil, "No patch available"
 end
 
+function HttpClient.getPendingAction()
+	local success, result = pcall(function()
+		return HttpService:RequestAsync({
+			Url = Config.BackendUrl .. "/pending-action",
+			Method = "GET",
+			Headers = { ["Content-Type"] = "application/json" },
+		})
+	end)
+
+	if success and result.StatusCode == 200 then
+		return HttpService:JSONDecode(result.Body), nil
+	end
+	return nil, "Failed to get pending action"
+end
+
+function HttpClient.confirmAction()
+	pcall(function()
+		HttpService:RequestAsync({
+			Url = Config.BackendUrl .. "/confirm-action",
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode({ ok = true }),
+		})
+	end)
+end
+
 return HttpClient

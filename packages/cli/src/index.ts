@@ -8,7 +8,7 @@ import { createRevertCommand } from "./commands/revert.js";
 import { createConfigCommand } from "./commands/config.js";
 import { createPresetsCommand } from "./commands/presets.js";
 import { startRepl } from "./repl/repl.js";
-import { startWsServer, stopWsServer } from "./ui/ws-server.js";
+import { startWsServer, stopWsServer, broadcast, onCommand } from "./ui/ws-server.js";
 import { launchUI, killUI } from "./ui/launch.js";
 import { spawnBackend, killBackend } from "./backend/spawn.js";
 import { healthCheck } from "./backend/client.js";
@@ -61,6 +61,45 @@ export async function main(): Promise<void> {
   }
 
   // Start WebSocket server for UI sync
+  onCommand(async (raw) => {
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith("/")) {
+      broadcast({ type: "commandError", message: "Commands must start with /" });
+      return;
+    }
+    const parts = trimmed.slice(1).split(/\s+/);
+    const cmdName = parts[0]!;
+    const args = parts.slice(1).join(" ");
+    const cmd = registry.get(cmdName);
+    if (!cmd) {
+      broadcast({ type: "commandError", message: `Unknown command: /${cmdName}` });
+      return;
+    }
+    // Capture console output during handler execution
+    const logs: string[] = [];
+    const origLog = console.log;
+    const origError = console.error;
+    console.log = (...a: unknown[]) => {
+      const line = a.map(String).join(" ");
+      logs.push(line);
+      origLog(...a);
+    };
+    console.error = (...a: unknown[]) => {
+      const line = a.map(String).join(" ");
+      logs.push(line);
+      origError(...a);
+    };
+    try {
+      await cmd.handler(args);
+      broadcast({ type: "commandOutput", command: cmdName, output: logs.join("\n") });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      broadcast({ type: "commandError", message });
+    } finally {
+      console.log = origLog;
+      console.error = origError;
+    }
+  });
   const wss = startWsServer(3001);
   wss.on("connection", (ws) => {
     const commands = registry.getAll().map((c) => ({

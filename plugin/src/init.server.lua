@@ -224,5 +224,54 @@ revertBtn.MouseButton1Click:Connect(function()
 	currentPatch = nil
 end)
 
--- Start health polling
+-- Auto-apply polling: checks backend for pending actions from CLI/UI
+local function pollActions()
+	while true do
+		if isConnected then
+			local action, err = HttpClient.getPendingAction()
+			if action and action.action == "apply" and action.patch then
+				outputLabel.Text = "Auto-applying from CLI..."
+				local results = PatchApply.apply(action.patch)
+
+				table.insert(checkpoints, {
+					patch = action.patch,
+					created = results.created,
+					createdInstances = results.createdInstances,
+				})
+				currentPatch = action.patch
+
+				local lines = { "Auto-applied: " .. (action.patch.effectName or "effect") }
+				if #results.errors > 0 then
+					table.insert(lines, "Errors:")
+					for _, e in ipairs(results.errors) do
+						table.insert(lines, "  " .. e.op .. ": " .. e.error)
+					end
+				else
+					table.insert(lines, "Created " .. #results.created .. " objects.")
+				end
+				outputLabel.Text = table.concat(lines, "\n")
+				HttpClient.confirmAction()
+
+			elseif action and action.action == "revert" then
+				if #checkpoints > 0 then
+					local cp = table.remove(checkpoints)
+					local count = 0
+					for _, inst in ipairs(cp.created) do
+						if inst and inst.Parent then
+							inst:Destroy()
+							count = count + 1
+						end
+					end
+					outputLabel.Text = "Auto-reverted from CLI.\nRemoved " .. count .. " objects."
+					currentPatch = nil
+				end
+				HttpClient.confirmAction()
+			end
+		end
+		task.wait(2)
+	end
+end
+
+-- Start health polling and action polling
 task.spawn(pollHealth)
+task.spawn(pollActions)

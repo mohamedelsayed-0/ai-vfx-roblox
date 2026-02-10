@@ -2,6 +2,7 @@ import type { SlashCommand } from "@vfxcopilot/shared";
 import { validatePatch } from "@vfxcopilot/shared";
 import { store, type Checkpoint } from "../state/store.js";
 import { broadcast } from "../ui/ws-server.js";
+import { applyPatch } from "../backend/client.js";
 
 let checkpointCounter = 0;
 
@@ -48,9 +49,12 @@ export function createApplyCommand(): SlashCommand {
       const checkpoints = [...store.getState().checkpoints, checkpoint];
       store.update({ checkpoints });
 
+      // Push to backend for plugin polling
+      await applyPatch(currentPatch, checkpoint.id, checkpoint.createdPaths);
+
       console.log(`  Applied: ${currentPatch.effectName}`);
       console.log(`  Checkpoint: ${checkpoint.id} (${currentPatch.operations.length} operations)`);
-      console.log("  Use /revert to undo.\n");
+      console.log("  Sent to Studio plugin. Use /revert to undo.\n");
 
       broadcast({ type: "patchApplied", checkpointId: checkpoint.id });
     },

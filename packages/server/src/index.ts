@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { healthRoute } from "./routes/health.js";
 import { generateRoute } from "./routes/generate.js";
+import { actionsRoute } from "./routes/actions.js";
 
 const port = parseInt(process.env["PORT"] || "3000", 10);
 
@@ -12,6 +13,7 @@ const app = Fastify({
 await app.register(cors, { origin: true });
 await app.register(healthRoute);
 await app.register(generateRoute);
+await app.register(actionsRoute);
 
 try {
   await app.listen({ port, host: "127.0.0.1" });
