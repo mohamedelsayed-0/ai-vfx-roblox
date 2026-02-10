@@ -15,7 +15,7 @@ export async function generateWithGemini(
 ): Promise<Patch> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-1.5-flash",
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.7,
@@ -29,8 +29,10 @@ export async function generateWithGemini(
   const userPrompt = `${SYSTEM_PROMPT}\n\n${contextInfo}\n\nUser request: ${prompt}`;
 
   // First attempt
+  console.log(`[Gemini] Generating with prompt length: ${userPrompt.length}`);
   const result = await model.generateContent(userPrompt);
   const text = result.response.text();
+  console.log(`[Gemini] Received response length: ${text.length}`);
 
   try {
     const parsed = JSON.parse(text);
