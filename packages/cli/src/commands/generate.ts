@@ -1,5 +1,5 @@
-import type { SlashCommand } from "@vfxcopilot/shared";
-import { PatchSchema, validatePatch } from "@vfxcopilot/shared";
+import type { SlashCommand, Patch } from "@vfxcopilot/shared";
+import { PatchSchema, validatePatch, getAnimationOperations } from "@vfxcopilot/shared";
 import { store } from "../state/store.js";
 import { generate as callGenerate } from "../backend/client.js";
 import { broadcast } from "../ui/ws-server.js";
@@ -8,20 +8,38 @@ export function createGenerateCommand(): SlashCommand {
   return {
     name: "generate",
     description: "Generate a VFX effect from description",
-    usage: "/generate <prompt>",
+    usage: "/generate [--with-animations] <prompt>",
     async handler(args: string) {
       if (!args.trim()) {
         console.log("Usage: /generate <prompt>");
         return;
       }
 
+      const withAnimations = args.includes("--with-animations");
+      const prompt = args.replace("--with-animations", "").trim();
+
+      if (!prompt) {
+        console.log("Usage: /generate <prompt>");
+        return;
+      }
+
       store.update({ status: "generating", lastError: null });
       broadcast({ type: "status", status: "generating" });
-      console.log(`\n  Generating: "${args.trim()}"...`);
+      console.log(`\n  Generating: "${prompt}"...`);
 
       try {
-        const result = await callGenerate(args.trim());
-        const patch = PatchSchema.parse(result.patch);
+        const result = await callGenerate(prompt);
+        let patch = PatchSchema.parse(result.patch);
+
+        // Append animation helpers if requested
+        if (withAnimations) {
+          const animOps = getAnimationOperations();
+          patch = {
+            ...patch,
+            operations: [...patch.operations, ...animOps],
+          } as Patch;
+          console.log(`  + Added ${animOps.length} animation helper modules`);
+        }
 
         store.update({ status: "idle", currentPatch: patch, lastError: null });
 
