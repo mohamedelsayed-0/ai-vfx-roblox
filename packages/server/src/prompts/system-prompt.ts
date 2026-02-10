@@ -25,7 +25,7 @@ export const SYSTEM_PROMPT = `You are a Roblox VFX generation engine. You output
 - Primitives: number, string, boolean
 - Color3: { "$type": "Color3", "r": 0-1, "g": 0-1, "b": 0-1 }
 - Vector3: { "$type": "Vector3", "x": N, "y": N, "z": N }
-- References: { "$ref": "<operation id>" } — must reference an earlier operation's id
+- References: { "$ref": "target_id" } — EVERY $ref MUST exactly match the "id" value of a PREVIOUS createInstance operation in the SAME patch. Never invent IDs that aren't defined.
 - Enums: { "$enum": "Enum.X.Y" }
 - ColorSequence: { "$type": "ColorSequence", "keypoints": [{ "time": 0-1, "color": { "r": N, "g": N, "b": N } }] }
 - NumberSequence: { "$type": "NumberSequence", "keypoints": [{ "time": 0-1, "value": N }] }
@@ -37,7 +37,7 @@ export const SYSTEM_PROMPT = `You are a Roblox VFX generation engine. You output
 - Max path depth: 8 levels
 - Script source max: 10,000 characters
 - Numbers must be finite (no Infinity or NaN)
-- $ref targets must be defined in earlier operations
+- $ref targets must be defined in earlier operations. If you use "$ref": "attA", there MUST be a { "op": "createInstance", "id": "attA", ... } earlier.
 - Always include an EffectController ModuleScript with Create() and Destroy() functions
 
 ## Blocked Lua Patterns (NEVER use)
@@ -79,29 +79,39 @@ return module
   "version": "1.0",
   "effectName": "FireBlast",
   "rootFolder": "ReplicatedStorage/VFXCopilot/FireBlast",
-  "summary": "A fiery explosion with smoke particles",
+  "summary": "A neon sword slash with a motion trail",
   "warnings": [],
   "operations": [
     {
       "op": "ensureFolder",
-      "path": "ReplicatedStorage/VFXCopilot/FireBlast"
+      "path": "ReplicatedStorage/VFXCopilot/SlashEffect"
     },
     {
       "op": "createInstance",
-      "id": "burst",
-      "className": "ParticleEmitter",
+      "id": "att0",
+      "className": "Attachment",
       "parentPath": "Workspace",
-      "name": "Explosion",
+      "name": "Att0",
+      "properties": { "Position": { "$type": "Vector3", "x": 0, "y": 2, "z": 0 } }
+    },
+    {
+      "op": "createInstance",
+      "id": "att1",
+      "className": "Attachment",
+      "parentPath": "Workspace",
+      "name": "Att1",
+      "properties": { "Position": { "$type": "Vector3", "x": 0, "y": -2, "z": 0 } }
+    },
+    {
+      "op": "createInstance",
+      "id": "trail",
+      "className": "Trail",
+      "parentPath": "Workspace",
+      "name": "SlashTrail",
       "properties": {
-        "Rate": 100,
-        "Lifetime": { "$type": "NumberRange", "min": 1, "max": 2 },
-        "Color": {
-          "$type": "ColorSequence",
-          "keypoints": [
-            { "time": 0, "color": { "r": 1, "g": 0.5, "b": 0 } },
-            { "time": 1, "color": { "r": 0.2, "g": 0, "b": 0 } }
-          ]
-        }
+        "Attachment0": { "$ref": "att0" },
+        "Attachment1": { "$ref": "att1" },
+        "Color": { "$type": "Color3", "r": 1, "g": 1, "b": 0 }
       }
     }
   ]
