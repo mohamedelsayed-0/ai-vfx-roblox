@@ -64,10 +64,42 @@ local function resolveOrEnsure(path, ensure)
 	return current
 end
 
+local function translateValue(val, registry)
+	if type(val) ~= "table" then return val end
+	if val["$ref"] then return registry[val["$ref"]] end
+	
+	local t = val["$type"]
+	if t == "Color3" then return Color3.new(val.r, val.g, val.b)
+	elseif t == "Vector3" then return Vector3.new(val.x, val.y, val.z)
+	elseif t == "NumberRange" then return NumberRange.new(val.min, val.max)
+	elseif t == "ColorSequence" then
+		local kps = {}
+		for _, k in ipairs(val.keypoints) do
+			table.insert(kps, ColorSequenceKeypoint.new(k.time, Color3.new(k.color.r, k.color.g, k.color.b)))
+		end
+		return ColorSequence.new(kps)
+	elseif t == "NumberSequence" then
+		local kps = {}
+		for _, k in ipairs(val.keypoints) do
+			table.insert(kps, NumberSequenceKeypoint.new(k.time, k.value))
+		end
+		return NumberSequence.new(kps)
+	end
+	
+	if val["$enum"] then
+		local p = string.split(val["$enum"], ".")
+		local e = Enum
+		for i = 2, #p do e = e[p[i]] end
+		return e
+	end
+	return val
+end
+
 function PatchApply.apply(patch)
 	local count = 0
 	local rootFolder = nil
 	local createdParts = {}
+	local registry = {}
 
 	for _, op in ipairs(patch.operations) do
 		local success, err = pcall(function()
@@ -79,9 +111,12 @@ function PatchApply.apply(patch)
 				local inst = Instance.new(op.className)
 				inst.Name = op.name
 				for prop, val in pairs(op.properties) do
-					pcall(function() inst[prop] = val end)
+					pcall(function() 
+						inst[prop] = translateValue(val, registry) 
+					end)
 				end
 				inst.Parent = parent
+				registry[op.id] = inst
 				if inst:IsA("BasePart") or inst:IsA("Attachment") then
 					table.insert(createdParts, inst)
 				end
@@ -128,7 +163,7 @@ function PatchApply.apply(patch)
 	return count
 end
 
-print("[VFX Copilot] Plugin active. Version 1.2")
+print("[VFX Copilot] Plugin active. Version 1.4")
 
 task.spawn(function()
 	local connected = nil -- Start as nil to force a print on first check
