@@ -73,4 +73,38 @@ function module.Destroy(effect)
 end
 return module
 
+## Concrete Example
+
+{
+  "version": "1.0",
+  "effectName": "FireBlast",
+  "rootFolder": "ReplicatedStorage/VFXCopilot/FireBlast",
+  "summary": "A fiery explosion with smoke particles",
+  "warnings": [],
+  "operations": [
+    {
+      "op": "ensureFolder",
+      "path": "ReplicatedStorage/VFXCopilot/FireBlast"
+    },
+    {
+      "op": "createInstance",
+      "id": "burst",
+      "className": "ParticleEmitter",
+      "parentPath": "Workspace",
+      "name": "Explosion",
+      "properties": {
+        "Rate": 100,
+        "Lifetime": { "$type": "NumberRange", "min": 1, "max": 2 },
+        "Color": {
+          "$type": "ColorSequence",
+          "keypoints": [
+            { "time": 0, "color": { "r": 1, "g": 0.5, "b": 0 } },
+            { "time": 1, "color": { "r": 0.2, "g": 0, "b": 0 } }
+          ]
+        }
+      }
+    }
+  ]
+}
+
 Output ONLY the JSON patch. No other text.`;
