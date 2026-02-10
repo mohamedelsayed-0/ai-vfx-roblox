@@ -11,13 +11,14 @@
     <header id="status-bar">
       <span id="status-indicator" class="status-disconnected"></span>
       <span id="status-text">Connecting...</span>
+      <span id="palette-hint">Ctrl+K</span>
     </header>
 
     <main id="content">
       <div id="welcome">
         <h1>VFX Copilot</h1>
         <p class="subtitle">AI-powered VFX for Roblox Studio</p>
-        <p class="hint">Type <code>/help</code> in the terminal or select a command below</p>
+        <p class="hint">Type <code>/help</code> in the terminal or press <code>Ctrl+K</code> for command palette</p>
       </div>
 
       <div id="command-list">
@@ -30,6 +31,15 @@
         <div id="patch-summary"></div>
       </div>
     </main>
+
+    <!-- Command Palette Overlay -->
+    <div id="command-palette" class="hidden">
+      <div id="palette-backdrop"></div>
+      <div id="palette-panel">
+        <input id="palette-input" type="text" placeholder="Search commands..." autocomplete="off">
+        <div id="palette-results"></div>
+      </div>
+    </div>
   </div>
   <script src="renderer.js"></script>
 </body>

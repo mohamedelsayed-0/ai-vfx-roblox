@@ -130,3 +130,84 @@ body {
   font-size: 14px;
   line-height: 1.5;
 }
+
+.warning { color: #f1c40f; }
+.success { color: #2ecc71; }
+
+#palette-hint {
+  margin-left: auto;
+  color: #6e6e8e;
+  font-size: 11px;
+  background: #0f3460;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+/* Command Palette */
+#command-palette {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+#palette-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+#palette-panel {
+  position: relative;
+  max-width: 400px;
+  margin: 60px auto 0;
+  background: #16213e;
+  border-radius: 12px;
+  border: 1px solid #0f3460;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+#palette-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  color: #e0e0e0;
+  font-size: 15px;
+  outline: none;
+  border-bottom: 1px solid #0f3460;
+}
+
+#palette-input::placeholder {
+  color: #6e6e8e;
+}
+
+#palette-results {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.palette-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.palette-item:hover {
+  background: #0f3460;
+}
+
+.palette-item .cmd-name {
+  color: #e94560;
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.palette-item .cmd-desc {
+  color: #8e8e8e;
+  font-size: 12px;
+}
