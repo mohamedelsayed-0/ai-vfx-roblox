@@ -19,3 +19,5 @@ export {
 } from "./constants.js";
 export { validatePatch } from "./validation/safety.js";
 export type { ValidationResult } from "./validation/safety.js";
+export { PRESETS, getPreset } from "./presets/index.js";
+export type { PresetInfo } from "./presets/index.js";
