@@ -41,19 +41,27 @@ export function createGenerateCommand(): SlashCommand {
           console.log(`  + Added ${animOps.length} animation helper modules`);
         }
 
-        store.update({ status: "idle", currentPatch: patch, lastError: null });
-
-        console.log(`  Generated: ${patch.summary}`);
-        if (patch.warnings.length) {
-          console.log(`  Warnings: ${patch.warnings.join(", ")}`);
-        }
-        console.log(`  Operations: ${patch.operations.length}`);
-
+        // Validate BEFORE storing — blocked patches should not be accessible via /apply
         const validation = validatePatch(patch);
+
         if (!validation.valid) {
-          console.log("  SAFETY: BLOCKED — use /preview to see errors.");
+          store.update({ status: "idle", currentPatch: null, lastError: null });
+          console.log(`  Generated: ${patch.summary}`);
+          console.log(`  Operations: ${patch.operations.length}`);
+          console.log("  REJECTED: Patch failed safety validation:");
+          for (const e of validation.errors) {
+            console.log(`    [BLOCKED] ${e}`);
+          }
+          console.log("  Cannot apply. Run /generate with a different prompt.\n");
+        } else {
+          store.update({ status: "idle", currentPatch: patch, lastError: null });
+          console.log(`  Generated: ${patch.summary}`);
+          if (patch.warnings.length) {
+            console.log(`  Warnings: ${patch.warnings.join(", ")}`);
+          }
+          console.log(`  Operations: ${patch.operations.length}`);
+          console.log("  Use /preview to inspect, /apply to apply.\n");
         }
-        console.log("  Use /preview to inspect, /apply to apply.\n");
 
         broadcast({
           type: "patchGenerated",

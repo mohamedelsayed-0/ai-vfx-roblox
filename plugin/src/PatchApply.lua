@@ -1,3 +1,5 @@
+local TweenService = game:GetService("TweenService")
+
 local PatchApply = {}
 
 -- Registry of created instances by operation id
@@ -285,12 +287,26 @@ function PatchApply.spawnPreview(effectFolder, effectName)
 	local clone = effectFolder:Clone()
 
 	-- Move VFX-relevant children from the cloned folder onto the Part
+	-- Also check if any trails exist (need Part motion to render)
+	local hasTrails = false
 	for _, child in ipairs(clone:GetChildren()) do
+		if child:IsA("Trail") then
+			hasTrails = true
+		end
 		if isVFXClass(child) then
 			child.Parent = previewPart
 		end
 	end
 	clone:Destroy()
+
+	-- Trail preview motion: oscillate the Part so trails actually render
+	if hasTrails then
+		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+		local tween = TweenService:Create(previewPart, tweenInfo, {
+			CFrame = previewPart.CFrame * CFrame.new(2, 0, 0)
+		})
+		tween:Play()
+	end
 
 	-- Auto-trigger burst emitters (Rate = 0) and replay infinitely
 	local burstEmitters = {}

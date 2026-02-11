@@ -50,11 +50,17 @@ export function createApplyCommand(): SlashCommand {
       store.update({ checkpoints });
 
       // Push to backend for plugin polling
-      await applyPatch(currentPatch, checkpoint.id, checkpoint.createdPaths);
-
-      console.log(`  Applied: ${currentPatch.effectName}`);
-      console.log(`  Checkpoint: ${checkpoint.id} (${currentPatch.operations.length} operations)`);
-      console.log("  Sent to Studio plugin. Use /revert to undo.\n");
+      try {
+        await applyPatch(currentPatch, checkpoint.id, checkpoint.createdPaths);
+        console.log(`  Applied: ${currentPatch.effectName}`);
+        console.log(`  Checkpoint: ${checkpoint.id} (${currentPatch.operations.length} operations)`);
+        console.log("  Sent to Studio plugin. Use /revert to undo.\n");
+      } catch {
+        console.log(`  Applied: ${currentPatch.effectName}`);
+        console.log(`  Checkpoint: ${checkpoint.id} (${currentPatch.operations.length} operations)`);
+        console.log("  WARNING: Failed to send to plugin — is the CLI backend running?");
+        console.log("  The patch was saved locally. Retry /apply when the backend is up.\n");
+      }
 
       broadcast({ type: "patchApplied", checkpointId: checkpoint.id });
     },

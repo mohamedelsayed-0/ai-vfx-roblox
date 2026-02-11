@@ -12,16 +12,16 @@ interface PendingRevert {
   paths: string[];
 }
 
-type PendingAction = PendingApply | PendingRevert | { action: "none" };
+type PendingAction = PendingApply | PendingRevert;
 
-let pendingAction: PendingAction = { action: "none" };
+const actionQueue: PendingAction[] = [];
 
 export async function actionsRoute(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { patch: unknown; checkpointId: string; createdPaths: string[] } }>(
     "/apply",
     async (request) => {
       const { patch, checkpointId, createdPaths } = request.body;
-      pendingAction = { action: "apply", patch, checkpointId, createdPaths };
+      actionQueue.push({ action: "apply", patch, checkpointId, createdPaths });
       app.log.info({ checkpointId }, "Patch queued for plugin");
       return { ok: true };
     },
@@ -31,23 +31,24 @@ export async function actionsRoute(app: FastifyInstance): Promise<void> {
     "/revert",
     async (request) => {
       const { paths } = request.body;
-      pendingAction = { action: "revert", paths };
+      actionQueue.push({ action: "revert", paths });
       app.log.info("Revert queued for plugin");
       return { ok: true };
     },
   );
 
   app.get("/pending-action", async () => {
-    const current = pendingAction;
-    if (current.action !== "none") {
-      console.log(`[Backend] Delivering action: ${current.action}`);
-      pendingAction = { action: "none" };
+    if (actionQueue.length === 0) {
+      return { action: "none" };
     }
-    return current;
+    // Return the first item without removing it — removal happens on confirm
+    return actionQueue[0];
   });
 
   app.post("/confirm-action", async () => {
-    pendingAction = { action: "none" };
+    if (actionQueue.length > 0) {
+      actionQueue.shift();
+    }
     return { ok: true };
   });
 }

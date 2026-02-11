@@ -41,23 +41,25 @@ export async function applyPatch(
   checkpointId: string,
   createdPaths: string[],
 ): Promise<void> {
-  try {
-    await fetch(`${BACKEND_URL}/apply`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ patch, checkpointId, createdPaths }),
-      signal: AbortSignal.timeout(5000),
-    });
-  } catch { /* backend may be unavailable */ }
+  const res = await fetch(`${BACKEND_URL}/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ patch, checkpointId, createdPaths }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) {
+    throw new Error(`Backend returned ${res.status}`);
+  }
 }
 
 export async function revertPatch(paths: string[]): Promise<void> {
-  try {
-    await fetch(`${BACKEND_URL}/revert`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths }),
-      signal: AbortSignal.timeout(5000),
-    });
-  } catch { /* backend may be unavailable */ }
+  const res = await fetch(`${BACKEND_URL}/revert`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paths }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) {
+    throw new Error(`Backend returned ${res.status}`);
+  }
 }

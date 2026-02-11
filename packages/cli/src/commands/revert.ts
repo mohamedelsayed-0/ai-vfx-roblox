@@ -20,10 +20,14 @@ export function createRevertCommand(): SlashCommand {
       store.update({ checkpoints: remaining, currentPatch: null });
 
       // Push to backend for plugin polling
-      await revertPatch(cp.createdPaths);
-
-      console.log(`  Reverted: ${cp.effectName} (${cp.id})`);
-      console.log(`  Removed ${cp.createdPaths.length} paths. Sent to Studio plugin.`);
+      try {
+        await revertPatch(cp.createdPaths);
+        console.log(`  Reverted: ${cp.effectName} (${cp.id})`);
+        console.log(`  Removed ${cp.createdPaths.length} paths. Sent to Studio plugin.`);
+      } catch {
+        console.log(`  Reverted locally: ${cp.effectName} (${cp.id})`);
+        console.log("  WARNING: Failed to send revert to plugin — is the CLI backend running?");
+      }
       if (remaining.length > 0) {
         console.log(`  ${remaining.length} checkpoint(s) remaining.`);
       }

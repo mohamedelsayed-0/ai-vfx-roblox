@@ -1,30 +1,73 @@
--- VFX Copilot — ROBUST BUNDLED PLUGIN
+-- VFX Copilot — BUNDLED PLUGIN v2.0
 -- Paste this into a Script in ServerStorage, set RunContext to Plugin.
+-- Includes: Config, HttpClient, PatchApply (with preview system), DockWidget UI
 
 local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
 
+--------------------------------------------------------------------------------
+-- CONFIG
+--------------------------------------------------------------------------------
 local Config = {
 	BackendUrl = "http://127.0.0.1:3000",
-	PollInterval = 2,
+	PollInterval = 5,
+	ActionPollInterval = 2,
 }
 
+--------------------------------------------------------------------------------
+-- HTTP CLIENT
+--------------------------------------------------------------------------------
 local HttpClient = {}
+
 function HttpClient.healthCheck()
 	local success, result = pcall(function()
-		return HttpService:RequestAsync({ Url = Config.BackendUrl .. "/health", Method = "GET" })
+		return HttpService:RequestAsync({
+			Url = Config.BackendUrl .. "/health",
+			Method = "GET",
+			Headers = { ["Content-Type"] = "application/json" },
+		})
 	end)
 	return success and result.StatusCode == 200
 end
 
+function HttpClient.generate(prompt, context)
+	context = context or { selectedObjects = {}, existingEffects = {} }
+	local body = HttpService:JSONEncode({
+		prompt = prompt,
+		context = context,
+	})
+
+	local success, result = pcall(function()
+		return HttpService:RequestAsync({
+			Url = Config.BackendUrl .. "/generate",
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = body,
+		})
+	end)
+
+	if not success then
+		return nil, "Network error: " .. tostring(result)
+	end
+	if result.StatusCode ~= 200 then
+		return nil, "Server error: " .. result.StatusCode
+	end
+	return HttpService:JSONDecode(result.Body), nil
+end
+
 function HttpClient.getPendingAction()
 	local success, result = pcall(function()
-		return HttpService:RequestAsync({ Url = Config.BackendUrl .. "/pending-action", Method = "GET" })
+		return HttpService:RequestAsync({
+			Url = Config.BackendUrl .. "/pending-action",
+			Method = "GET",
+			Headers = { ["Content-Type"] = "application/json" },
+		})
 	end)
 	if success and result.StatusCode == 200 then
 		local decoded = HttpService:JSONDecode(result.Body)
-		return (decoded and decoded.action ~= "none") and decoded or nil
+		return decoded, nil
 	end
-	return nil
+	return nil, "Failed to get pending action"
 end
 
 function HttpClient.confirmAction()
@@ -32,30 +75,35 @@ function HttpClient.confirmAction()
 		HttpService:RequestAsync({
 			Url = Config.BackendUrl .. "/confirm-action",
 			Method = "POST",
-			Body = HttpService:JSONEncode({ ok = true })
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode({ ok = true }),
 		})
 	end)
 end
 
+--------------------------------------------------------------------------------
+-- PATCH APPLY ENGINE
+--------------------------------------------------------------------------------
 local PatchApply = {}
+local createdInstances = {}
+
+-- Resolve path using GetService for the first segment (handles ReplicatedStorage, Workspace, etc.)
 local function resolveOrEnsure(path, ensure)
 	local parts = string.split(path, "/")
 	local current = game
 	for i, part in ipairs(parts) do
 		local child
 		if i == 1 then
-			-- Standard Roblox Services
 			local ok, service = pcall(function() return game:GetService(part) end)
 			child = ok and service or current:FindFirstChild(part)
 		else
 			child = current:FindFirstChild(part)
 		end
-		
+
 		if not child and ensure then
 			child = Instance.new("Folder")
 			child.Name = part
 			child.Parent = current
-			print("[VFX Copilot] Created folder: " .. path)
 		elseif not child then
 			return nil
 		end
@@ -64,132 +112,518 @@ local function resolveOrEnsure(path, ensure)
 	return current
 end
 
-local function translateValue(val, registry)
-	if type(val) ~= "table" then return val end
-	if val["$ref"] then return registry[val["$ref"]] end
-	
-	local t = val["$type"]
-	if t == "Color3" then return Color3.new(val.r, val.g, val.b)
-	elseif t == "Vector3" then return Vector3.new(val.x, val.y, val.z)
-	elseif t == "NumberRange" then return NumberRange.new(val.min, val.max)
-	elseif t == "ColorSequence" then
+-- Resolve a property value, handling $ref, $type, $enum
+local function resolveValue(value)
+	if type(value) ~= "table" then return value end
+
+	if value["$ref"] then
+		local ref = createdInstances[value["$ref"]]
+		if not ref then
+			warn("[VFX Copilot] $ref not found: " .. value["$ref"])
+			return nil
+		end
+		return ref
+	end
+
+	if value["$enum"] then
+		local parts = string.split(value["$enum"], ".")
+		local current = Enum
+		for i = 2, #parts do
+			current = current[parts[i]]
+		end
+		return current
+	end
+
+	local typeName = value["$type"]
+	if typeName == "Color3" then
+		return Color3.new(value.r, value.g, value.b)
+	elseif typeName == "Vector3" then
+		return Vector3.new(value.x, value.y, value.z)
+	elseif typeName == "NumberRange" then
+		return NumberRange.new(value.min, value.max)
+	elseif typeName == "ColorSequence" then
 		local kps = {}
-		for _, k in ipairs(val.keypoints) do
+		for _, k in ipairs(value.keypoints) do
 			table.insert(kps, ColorSequenceKeypoint.new(k.time, Color3.new(k.color.r, k.color.g, k.color.b)))
 		end
 		return ColorSequence.new(kps)
-	elseif t == "NumberSequence" then
+	elseif typeName == "NumberSequence" then
 		local kps = {}
-		for _, k in ipairs(val.keypoints) do
+		for _, k in ipairs(value.keypoints) do
 			table.insert(kps, NumberSequenceKeypoint.new(k.time, k.value))
 		end
 		return NumberSequence.new(kps)
 	end
-	
-	if val["$enum"] then
-		local p = string.split(val["$enum"], ".")
-		local e = Enum
-		for i = 2, #p do e = e[p[i]] end
-		return e
-	end
-	return val
+
+	return value
 end
 
+-- VFX class check
+local VFX_CLASSES = {
+	"ParticleEmitter", "Trail", "Beam", "Attachment",
+	"PointLight", "SpotLight", "SurfaceLight", "Sound",
+}
+
+local function isVFXClass(instance)
+	for _, className in ipairs(VFX_CLASSES) do
+		if instance:IsA(className) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Apply a full patch
 function PatchApply.apply(patch)
-	local count = 0
-	local rootFolder = nil
-	local createdParts = {}
-	local registry = {}
+	createdInstances = {}
+	local results = { created = {}, errors = {}, warnings = {} }
 
 	for _, op in ipairs(patch.operations) do
 		local success, err = pcall(function()
 			if op.op == "ensureFolder" then
-				local folder = resolveOrEnsure(op.path, true)
-				if not rootFolder then rootFolder = folder end
+				resolveOrEnsure(op.path, true)
 			elseif op.op == "createInstance" then
 				local parent = resolveOrEnsure(op.parentPath, true)
 				local inst = Instance.new(op.className)
 				inst.Name = op.name
 				for prop, val in pairs(op.properties) do
-					pcall(function() 
-						inst[prop] = translateValue(val, registry) 
-					end)
+					local resolved = resolveValue(val)
+					if resolved ~= nil then
+						pcall(function()
+							inst[prop] = resolved
+						end)
+					end
 				end
 				inst.Parent = parent
-				registry[op.id] = inst
-				if inst:IsA("BasePart") or inst:IsA("Attachment") then
-					table.insert(createdParts, inst)
-				end
-				count = count + 1
+				createdInstances[op.id] = inst
+				table.insert(results.created, inst)
 			elseif op.op == "createScript" then
-				local parts = string.split(op.path, "/")
-				local name = parts[#parts]
-				local pPath = table.concat(parts, "/", 1, #parts-1)
-				local parent = resolveOrEnsure(pPath, true)
+				local pathParts = string.split(op.path, "/")
+				local scriptName = pathParts[#pathParts]
+				local parentPath = table.concat(pathParts, "/", 1, #pathParts - 1)
+				local parent = resolveOrEnsure(parentPath, true)
 				local s = Instance.new(op.scriptType or "ModuleScript")
-				s.Name = name
+				s.Name = scriptName
 				s.Source = op.source
 				s.Parent = parent
-				count = count + 1
+				table.insert(results.created, s)
+			elseif op.op == "setProperty" then
+				local target = resolveOrEnsure(op.targetPath, false)
+				if target then
+					local resolved = resolveValue(op.value)
+					target[op.property] = resolved
+				end
+			elseif op.op == "deleteInstance" then
+				local target = resolveOrEnsure(op.path, false)
+				if target then target:Destroy() end
+			elseif op.op == "moveInstance" then
+				local source = resolveOrEnsure(op.fromPath, false)
+				local dest = resolveOrEnsure(op.toPath, true)
+				if source and dest then source.Parent = dest end
 			end
 		end)
-		if not success then warn("[VFX Copilot] Error in op " .. op.op .. ": " .. tostring(err)) end
+
+		if not success then
+			table.insert(results.errors, { op = op.op, error = tostring(err) })
+			if op.op == "createInstance" or op.op == "createScript" then
+				break
+			end
+		end
 	end
 
-	-- Move to camera view if in Workspace
-	if rootFolder and rootFolder:IsDescendantOf(workspace) then
-		local cam = workspace.CurrentCamera
-		if cam then
-			local targetPos = cam.CFrame.Position + (cam.CFrame.LookVector * 15)
-			if #createdParts > 0 then
-				local center = Vector3.new(0,0,0)
-				for _, p in ipairs(createdParts) do 
-					local pPos = p:IsA("BasePart") and p.Position or p.WorldPosition
-					center = center + pPos 
-				end
-				center = center / #createdParts
-				local offset = targetPos - center
-				for _, p in ipairs(createdParts) do 
-					if p:IsA("BasePart") then
-						p.Position = p.Position + offset 
-					else
-						p.WorldPosition = p.WorldPosition + offset
+	results.createdInstances = createdInstances
+	return results
+end
+
+-- Spawn visible preview in Workspace so the user sees the effect
+function PatchApply.spawnPreview(effectFolder, effectName)
+	local wpVFX = game.Workspace:FindFirstChild("VFXCopilot")
+	if not wpVFX then
+		wpVFX = Instance.new("Folder")
+		wpVFX.Name = "VFXCopilot"
+		wpVFX.Parent = game.Workspace
+	end
+	local previews = wpVFX:FindFirstChild("Previews")
+	if not previews then
+		previews = Instance.new("Folder")
+		previews.Name = "Previews"
+		previews.Parent = wpVFX
+	end
+
+	local existing = previews:FindFirstChild(effectName .. "_Preview")
+	if existing then existing:Destroy() end
+
+	local previewPart = Instance.new("Part")
+	previewPart.Name = effectName .. "_Preview"
+	previewPart.Anchored = true
+	previewPart.CanCollide = false
+	previewPart.Transparency = 1
+	previewPart.Size = Vector3.new(1, 1, 1)
+
+	local camera = game.Workspace.CurrentCamera
+	if camera then
+		previewPart.CFrame = camera.CFrame * CFrame.new(0, 0, -10)
+	else
+		previewPart.Position = Vector3.new(0, 5, 0)
+	end
+
+	previewPart.Parent = previews
+
+	local clone = effectFolder:Clone()
+
+	-- Check if any trails exist (need Part motion to render)
+	local hasTrails = false
+	for _, child in ipairs(clone:GetChildren()) do
+		if child:IsA("Trail") then
+			hasTrails = true
+		end
+		if isVFXClass(child) then
+			child.Parent = previewPart
+		end
+	end
+	clone:Destroy()
+
+	-- Trail preview motion: oscillate the Part so trails actually render
+	if hasTrails then
+		local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+		local tween = TweenService:Create(previewPart, tweenInfo, {
+			CFrame = previewPart.CFrame * CFrame.new(2, 0, 0)
+		})
+		tween:Play()
+	end
+
+	-- Auto-trigger burst emitters (Rate = 0) and replay infinitely
+	local burstEmitters = {}
+	for _, child in ipairs(previewPart:GetChildren()) do
+		if child:IsA("ParticleEmitter") and child.Rate == 0 then
+			table.insert(burstEmitters, child)
+		end
+	end
+
+	if #burstEmitters > 0 then
+		for _, emitter in ipairs(burstEmitters) do
+			emitter:Emit(25)
+		end
+		task.spawn(function()
+			while previewPart and previewPart.Parent do
+				task.wait(2)
+				for _, emitter in ipairs(burstEmitters) do
+					if emitter and emitter.Parent then
+						emitter:Emit(25)
 					end
 				end
 			end
+		end)
+	end
+
+	return previewPart
+end
+
+-- Destroy a preview (tween stops automatically when Part is destroyed)
+function PatchApply.destroyPreview(previewPart)
+	if previewPart and previewPart.Parent then
+		previewPart:Destroy()
+	end
+end
+
+--------------------------------------------------------------------------------
+-- UI: DOCK WIDGET
+--------------------------------------------------------------------------------
+local toolbar = plugin:CreateToolbar("VFX Copilot")
+local toggleButton = toolbar:CreateButton(
+	"VFX Copilot",
+	"Open VFX Copilot panel",
+	"rbxassetid://0"
+)
+
+local widgetInfo = DockWidgetPluginGuiInfo.new(
+	Enum.InitialDockState.Right,
+	false, false,
+	400, 600, 300, 400
+)
+
+local widget = plugin:CreateDockWidgetPluginGui("VFXCopilotWidget", widgetInfo)
+widget.Title = "VFX Copilot"
+
+-- Main frame
+local screenGui = Instance.new("Frame")
+screenGui.Size = UDim2.new(1, 0, 1, 0)
+screenGui.BackgroundColor3 = Color3.fromRGB(26, 26, 46)
+screenGui.BorderSizePixel = 0
+screenGui.Parent = widget
+
+-- Status label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -16, 0, 30)
+statusLabel.Position = UDim2.new(0, 8, 0, 8)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(224, 224, 224)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.TextSize = 14
+statusLabel.Font = Enum.Font.SourceSansSemibold
+statusLabel.Text = "Disconnected"
+statusLabel.Parent = screenGui
+
+-- Prompt input
+local promptBox = Instance.new("TextBox")
+promptBox.Size = UDim2.new(1, -16, 0, 60)
+promptBox.Position = UDim2.new(0, 8, 0, 46)
+promptBox.BackgroundColor3 = Color3.fromRGB(22, 33, 62)
+promptBox.TextColor3 = Color3.fromRGB(224, 224, 224)
+promptBox.PlaceholderText = "Describe your VFX effect..."
+promptBox.PlaceholderColor3 = Color3.fromRGB(110, 110, 142)
+promptBox.TextSize = 14
+promptBox.Font = Enum.Font.SourceSans
+promptBox.TextWrapped = true
+promptBox.TextXAlignment = Enum.TextXAlignment.Left
+promptBox.TextYAlignment = Enum.TextYAlignment.Top
+promptBox.ClearTextOnFocus = false
+promptBox.Parent = screenGui
+
+-- Generate button
+local generateBtn = Instance.new("TextButton")
+generateBtn.Size = UDim2.new(0.48, 0, 0, 32)
+generateBtn.Position = UDim2.new(0, 8, 0, 114)
+generateBtn.BackgroundColor3 = Color3.fromRGB(233, 69, 96)
+generateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+generateBtn.Text = "Generate"
+generateBtn.TextSize = 14
+generateBtn.Font = Enum.Font.SourceSansBold
+generateBtn.Parent = screenGui
+
+-- Apply button
+local applyBtn = Instance.new("TextButton")
+applyBtn.Size = UDim2.new(0.48, 0, 0, 32)
+applyBtn.Position = UDim2.new(0.52, 0, 0, 114)
+applyBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+applyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+applyBtn.Text = "Apply"
+applyBtn.TextSize = 14
+applyBtn.Font = Enum.Font.SourceSansBold
+applyBtn.Parent = screenGui
+
+-- Revert button
+local revertBtn = Instance.new("TextButton")
+revertBtn.Size = UDim2.new(1, -16, 0, 28)
+revertBtn.Position = UDim2.new(0, 8, 0, 154)
+revertBtn.BackgroundColor3 = Color3.fromRGB(44, 62, 80)
+revertBtn.TextColor3 = Color3.fromRGB(224, 224, 224)
+revertBtn.Text = "Revert Last"
+revertBtn.TextSize = 13
+revertBtn.Font = Enum.Font.SourceSans
+revertBtn.Parent = screenGui
+
+-- Output / Summary area
+local outputLabel = Instance.new("TextLabel")
+outputLabel.Size = UDim2.new(1, -16, 1, -200)
+outputLabel.Position = UDim2.new(0, 8, 0, 190)
+outputLabel.BackgroundColor3 = Color3.fromRGB(22, 33, 62)
+outputLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+outputLabel.TextSize = 13
+outputLabel.Font = Enum.Font.SourceSans
+outputLabel.TextWrapped = true
+outputLabel.TextXAlignment = Enum.TextXAlignment.Left
+outputLabel.TextYAlignment = Enum.TextYAlignment.Top
+outputLabel.Text = "VFX Copilot ready.\nType a prompt and click Generate."
+outputLabel.Parent = screenGui
+
+--------------------------------------------------------------------------------
+-- STATE
+--------------------------------------------------------------------------------
+local currentPatch = nil
+local checkpoints = {}
+local isConnected = false
+
+-- Toggle widget visibility
+toggleButton.Click:Connect(function()
+	widget.Enabled = not widget.Enabled
+end)
+
+--------------------------------------------------------------------------------
+-- HELPERS
+--------------------------------------------------------------------------------
+
+local function findEffectFolder(patch)
+	local effectName = patch.effectName
+	local rootPath = patch.rootFolder or "ReplicatedStorage/VFXCopilot/Effects"
+	local fullPath = rootPath .. "/" .. effectName
+	return resolveOrEnsure(fullPath, false)
+end
+
+local function applyPatchWithPreview(patch)
+	local results = PatchApply.apply(patch)
+
+	local previewPart = nil
+	if #results.errors == 0 then
+		local effectFolder = findEffectFolder(patch)
+		if effectFolder then
+			previewPart = PatchApply.spawnPreview(effectFolder, patch.effectName or "effect")
 		end
 	end
 
+	return {
+		patch = patch,
+		created = results.created,
+		createdInstances = results.createdInstances,
+		previewPart = previewPart,
+	}, results
+end
+
+local function revertCheckpoint(cp)
+	local count = 0
+	for _, inst in ipairs(cp.created) do
+		if inst and inst.Parent then
+			inst:Destroy()
+			count = count + 1
+		end
+	end
+	if cp.previewPart then
+		PatchApply.destroyPreview(cp.previewPart)
+	end
 	return count
 end
 
-print("[VFX Copilot] Plugin active. Version 1.4")
+--------------------------------------------------------------------------------
+-- HANDLERS
+--------------------------------------------------------------------------------
 
-task.spawn(function()
-	local connected = nil -- Start as nil to force a print on first check
-	print("[VFX Copilot] Starting connection loop to: " .. Config.BackendUrl)
-	
-	while true do
-		local healthy = HttpClient.healthCheck()
-		
-		if healthy ~= connected then
-			connected = healthy
-			if healthy then
-				print("🟢 [VFX Copilot] Connected to Backend!")
-			else
-				warn("🔴 [VFX Copilot] Backend Disconnected. (Ensure CLI is running at " .. Config.BackendUrl .. ")")
-			end
+-- Generate handler
+generateBtn.MouseButton1Click:Connect(function()
+	local prompt = promptBox.Text
+	if prompt == "" then
+		outputLabel.Text = "Please enter a prompt."
+		return
+	end
+
+	if not isConnected then
+		outputLabel.Text = "Backend not connected.\nIs the CLI running?"
+		return
+	end
+
+	outputLabel.Text = "Generating..."
+	generateBtn.Text = "Generating..."
+
+	local result, err = HttpClient.generate(prompt)
+
+	generateBtn.Text = "Generate"
+
+	if err then
+		outputLabel.Text = "Error: " .. tostring(err)
+		return
+	end
+
+	currentPatch = result.patch
+	local lines = {
+		"Effect: " .. (result.patch.effectName or "Unknown"),
+		"Summary: " .. (result.summary or ""),
+		"Operations: " .. #result.patch.operations,
+		"",
+	}
+	if result.warnings and #result.warnings > 0 then
+		table.insert(lines, "Warnings:")
+		for _, w in ipairs(result.warnings) do
+			table.insert(lines, "  - " .. w)
 		end
-		
-		if connected then
-			local action = HttpClient.getPendingAction()
-			if action and action.action == "apply" then
-				print("📦 [VFX Copilot] Received Patch: " .. (action.patch.effectName or "unnamed"))
-				local n = PatchApply.apply(action.patch)
-				warn("✅ [VFX Copilot] Successfully created " .. n .. " objects.")
+	end
+	table.insert(lines, "")
+	table.insert(lines, "Click Apply to create in Studio.")
+	outputLabel.Text = table.concat(lines, "\n")
+end)
+
+-- Apply handler
+applyBtn.MouseButton1Click:Connect(function()
+	if not currentPatch then
+		outputLabel.Text = "No patch to apply. Generate first."
+		return
+	end
+
+	outputLabel.Text = "Applying patch..."
+	local checkpoint, results = applyPatchWithPreview(currentPatch)
+	table.insert(checkpoints, checkpoint)
+
+	local lines = { "Applied: " .. currentPatch.effectName }
+	if #results.errors > 0 then
+		table.insert(lines, "Errors:")
+		for _, e in ipairs(results.errors) do
+			table.insert(lines, "  " .. e.op .. ": " .. e.error)
+		end
+	else
+		table.insert(lines, "Created " .. #results.created .. " objects.")
+		table.insert(lines, "Preview spawned in Workspace/VFXCopilot/Previews/")
+	end
+	table.insert(lines, "Checkpoint saved. Use Revert to undo.")
+	outputLabel.Text = table.concat(lines, "\n")
+end)
+
+-- Revert handler
+revertBtn.MouseButton1Click:Connect(function()
+	if #checkpoints == 0 then
+		outputLabel.Text = "No checkpoints to revert."
+		return
+	end
+
+	local cp = table.remove(checkpoints)
+	local count = revertCheckpoint(cp)
+	outputLabel.Text = "Reverted: " .. cp.patch.effectName .. "\nRemoved " .. count .. " objects + preview."
+	currentPatch = nil
+end)
+
+--------------------------------------------------------------------------------
+-- POLLING
+--------------------------------------------------------------------------------
+
+-- Health polling
+local function pollHealth()
+	while true do
+		local ok = HttpClient.healthCheck()
+		isConnected = ok
+		statusLabel.Text = ok and "Connected" or "Disconnected"
+		statusLabel.TextColor3 = ok
+			and Color3.fromRGB(46, 204, 113)
+			or Color3.fromRGB(231, 76, 60)
+		task.wait(Config.PollInterval)
+	end
+end
+
+-- Action polling: checks backend for pending actions from CLI
+local function pollActions()
+	while true do
+		if isConnected then
+			local action, err = HttpClient.getPendingAction()
+			if action and action.action == "apply" and action.patch then
+				outputLabel.Text = "Auto-applying from CLI..."
+				local checkpoint, results = applyPatchWithPreview(action.patch)
+				table.insert(checkpoints, checkpoint)
+				currentPatch = action.patch
+
+				local lines = { "Auto-applied: " .. (action.patch.effectName or "effect") }
+				if #results.errors > 0 then
+					table.insert(lines, "Errors:")
+					for _, e in ipairs(results.errors) do
+						table.insert(lines, "  " .. e.op .. ": " .. e.error)
+					end
+				else
+					table.insert(lines, "Created " .. #results.created .. " objects.")
+					table.insert(lines, "Preview spawned in Workspace/VFXCopilot/Previews/")
+				end
+				outputLabel.Text = table.concat(lines, "\n")
+				HttpClient.confirmAction()
+
+			elseif action and action.action == "revert" then
+				if #checkpoints > 0 then
+					local cp = table.remove(checkpoints)
+					local count = revertCheckpoint(cp)
+					outputLabel.Text = "Auto-reverted from CLI.\nRemoved " .. count .. " objects + preview."
+					currentPatch = nil
+				end
 				HttpClient.confirmAction()
 			end
 		end
-		task.wait(Config.PollInterval)
+		task.wait(Config.ActionPollInterval)
 	end
-end)
+end
+
+-- Start polling loops
+print("[VFX Copilot] Plugin active. Version 2.0")
+task.spawn(pollHealth)
+task.spawn(pollActions)
