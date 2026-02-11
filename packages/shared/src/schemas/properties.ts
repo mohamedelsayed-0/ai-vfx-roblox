@@ -14,6 +14,12 @@ export const Vector3Schema = z.object({
   z: z.number().finite(),
 });
 
+export const Vector2Schema = z.object({
+  $type: z.literal("Vector2"),
+  x: z.number().finite(),
+  y: z.number().finite(),
+});
+
 export const RefSchema = z.object({
   $ref: z.string().min(1),
 });
@@ -42,14 +48,22 @@ export const NumberSequenceSchema = z.object({
   keypoints: z.array(NumberKeypointSchema).min(1),
 });
 
+export const NumberRangeSchema = z.object({
+  $type: z.literal("NumberRange"),
+  min: z.number().finite(),
+  max: z.number().finite(),
+});
+
 export const PropertyValueSchema: z.ZodType = z.union([
   z.number().finite(),
   z.string().max(10000),
   z.boolean(),
   Color3Schema,
   Vector3Schema,
+  Vector2Schema,
   RefSchema,
   EnumSchema,
   ColorSequenceSchema,
   NumberSequenceSchema,
+  NumberRangeSchema,
 ]);

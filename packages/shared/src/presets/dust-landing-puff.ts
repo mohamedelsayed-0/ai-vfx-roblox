@@ -57,7 +57,7 @@ export const dustLandingPuff: Patch = {
             { time: 1, color: { r: 0.5, g: 0.45, b: 0.35 } },
           ],
         },
-        SpreadAngle: { $type: "Vector3", x: 60, y: 10, z: 0 },
+        SpreadAngle: { $type: "Vector2", x: 60, y: 10 },
         RotSpeed: {
           $type: "NumberSequence",
           keypoints: [
@@ -104,7 +104,7 @@ export const dustLandingPuff: Patch = {
             { time: 1, color: { r: 0.4, g: 0.35, b: 0.25 } },
           ],
         },
-        SpreadAngle: { $type: "Vector3", x: 45, y: 20, z: 0 },
+        SpreadAngle: { $type: "Vector2", x: 45, y: 20 },
       },
     },
     {

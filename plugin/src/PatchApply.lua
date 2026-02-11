@@ -1,4 +1,5 @@
 local TweenService = game:GetService("TweenService")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
 
 local PatchApply = {}
 
@@ -51,6 +52,10 @@ local function resolveValue(value)
 		return Color3.new(value.r, value.g, value.b)
 	elseif typeName == "Vector3" then
 		return Vector3.new(value.x, value.y, value.z)
+	elseif typeName == "Vector2" then
+		return Vector2.new(value.x, value.y)
+	elseif typeName == "NumberRange" then
+		return NumberRange.new(value.min, value.max)
 	elseif typeName == "ColorSequence" then
 		local keypoints = {}
 		for _, kp in ipairs(value.keypoints) do
@@ -187,6 +192,8 @@ function PatchApply.apply(patch)
 	createdInstances = {} -- reset registry
 	local results = { created = {}, errors = {}, warnings = {} }
 
+	local recording = ChangeHistoryService:TryBeginRecording("VFXCopilot: " .. (patch.effectName or "effect"))
+
 	for _, op in ipairs(patch.operations) do
 		local success, err = pcall(function()
 			if op.op == "ensureFolder" then
@@ -215,6 +222,14 @@ function PatchApply.apply(patch)
 			if op.op == "createInstance" or op.op == "createScript" then
 				break
 			end
+		end
+	end
+
+	if recording then
+		if #results.errors > 0 then
+			ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
+		else
+			ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 		end
 	end
 
@@ -333,6 +348,12 @@ function PatchApply.spawnPreview(effectFolder, effectName)
 				end
 			end
 		end)
+	end
+
+	-- Auto-focus camera on the preview
+	local cam = game.Workspace.CurrentCamera
+	if cam then
+		cam.CFrame = CFrame.new(previewPart.Position + Vector3.new(5, 3, 5), previewPart.Position)
 	end
 
 	return previewPart, burstConnection

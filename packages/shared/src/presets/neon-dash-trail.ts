@@ -112,7 +112,7 @@ export const neonDashTrail: Patch = {
           ],
         },
         LightEmission: 1,
-        SpreadAngle: { $type: "Vector3", x: 30, y: 30, z: 0 },
+        SpreadAngle: { $type: "Vector2", x: 30, y: 30 },
       },
     },
     {

@@ -1,6 +1,15 @@
 export const ALLOWED_ROOTS = [
   "ReplicatedStorage/VFXCopilot/",
   "Workspace/VFXCopilot/",
+  "Lighting/",
+];
+
+export const ALLOWED_LIGHTING_CLASSES = [
+  "BloomEffect",
+  "BlurEffect",
+  "ColorCorrectionEffect",
+  "SunRaysEffect",
+  "DepthOfFieldEffect",
 ];
 
 export const MAX_PATH_DEPTH = 8;

@@ -29,7 +29,8 @@ export const SYSTEM_PROMPT = `You are a Roblox VFX generation engine. You output
 - Enums: { "$enum": "Enum.X.Y" }
 - ColorSequence: { "$type": "ColorSequence", "keypoints": [{ "time": 0-1, "color": { "r": N, "g": N, "b": N } }] }
 - NumberSequence: { "$type": "NumberSequence", "keypoints": [{ "time": 0-1, "value": N }] }
-- Vector2: { "$type": "Vector3", "x": N, "y": N, "z": 0 } (use Vector3 for SpreadAngle with z=0)
+- Vector2: { "$type": "Vector2", "x": N, "y": N } (use for SpreadAngle, NOT Vector3)
+- NumberRange: { "$type": "NumberRange", "min": N, "max": N } (use for RotSpeed, etc.)
 
 ## Constraints
 
@@ -72,7 +73,7 @@ ParticleEmitter MUST have these properties set for visible output:
 - Enabled: true (always set explicitly)
 - LightEmission: 0-1 (use 1 for glowing/neon effects)
 - Transparency: NumberSequence (fade out at end: time 0 = 0, time 1 = 1)
-- SpreadAngle: Vector3 with x and y angles (z is ignored, set to 0)
+- SpreadAngle: Vector2 with x and y angles (MUST use "$type": "Vector2", NOT Vector3)
 
 Trail MUST have:
 - Attachment0 and Attachment1: $ref to two separate Attachment instances
@@ -203,7 +204,7 @@ For continuous effects (Rate > 0), the emitters will auto-emit when parented to 
           { "time": 1, "value": 1 }
         ]},
         "LightEmission": 1,
-        "SpreadAngle": { "$type": "Vector3", "x": 45, "y": 45, "z": 0 }
+        "SpreadAngle": { "$type": "Vector2", "x": 45, "y": 45 }
       }
     },
     {
@@ -273,7 +274,7 @@ For continuous effects (Rate > 0), the emitters will auto-emit when parented to 
           { "time": 1, "value": 1 }
         ]},
         "LightEmission": 1,
-        "SpreadAngle": { "$type": "Vector3", "x": 180, "y": 180, "z": 0 }
+        "SpreadAngle": { "$type": "Vector2", "x": 180, "y": 180 }
       }
     },
     {

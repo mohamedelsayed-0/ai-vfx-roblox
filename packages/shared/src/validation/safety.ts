@@ -1,5 +1,22 @@
 import type { Patch, Operation } from "../schemas/patch.js";
-import { ALLOWED_ROOTS, MAX_PATH_DEPTH, MAX_OPERATIONS, BLOCKED_LUA_PATTERNS } from "../constants.js";
+import { ALLOWED_ROOTS, MAX_PATH_DEPTH, MAX_OPERATIONS, BLOCKED_LUA_PATTERNS, ALLOWED_LIGHTING_CLASSES } from "../constants.js";
+
+const VALID_CLASS_NAMES = new Set([
+  // VFX
+  "ParticleEmitter", "Trail", "Beam", "Attachment",
+  // Lights
+  "PointLight", "SpotLight", "SurfaceLight",
+  // Audio
+  "Sound",
+  // Containers
+  "Folder", "Model", "Part", "MeshPart",
+  // Post-processing
+  "BloomEffect", "BlurEffect", "ColorCorrectionEffect", "SunRaysEffect", "DepthOfFieldEffect",
+  // Scripts
+  "Script", "LocalScript", "ModuleScript",
+  // UI
+  "BillboardGui", "TextLabel", "Frame", "ImageLabel",
+]);
 
 export interface ValidationResult {
   valid: boolean;
@@ -44,6 +61,19 @@ export function validatePatch(patch: Patch): ValidationResult {
       }
       if (p.split("/").length > MAX_PATH_DEPTH) {
         errors.push(`Path too deep: ${p} (max ${MAX_PATH_DEPTH} levels)`);
+      }
+    }
+  }
+
+  // className validation
+  for (const op of patch.operations) {
+    if (op.op === "createInstance") {
+      if (!VALID_CLASS_NAMES.has(op.className)) {
+        errors.push(`Unknown or disallowed className: "${op.className}" in ${op.name}`);
+      }
+      // Restrict Lighting path to allowed post-processing classes
+      if (op.parentPath.startsWith("Lighting/") && !ALLOWED_LIGHTING_CLASSES.includes(op.className)) {
+        errors.push(`Class "${op.className}" not allowed in Lighting. Only post-processing effects permitted.`);
       }
     }
   }

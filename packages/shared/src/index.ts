@@ -5,10 +5,12 @@ export type { Patch, Operation } from "./schemas/patch.js";
 export {
   Color3Schema,
   Vector3Schema,
+  Vector2Schema,
   RefSchema,
   EnumSchema,
   ColorSequenceSchema,
   NumberSequenceSchema,
+  NumberRangeSchema,
   PropertyValueSchema,
 } from "./schemas/properties.js";
 export {
@@ -16,6 +18,7 @@ export {
   MAX_PATH_DEPTH,
   MAX_OPERATIONS,
   BLOCKED_LUA_PATTERNS,
+  ALLOWED_LIGHTING_CLASSES,
 } from "./constants.js";
 export { validatePatch } from "./validation/safety.js";
 export type { ValidationResult } from "./validation/safety.js";

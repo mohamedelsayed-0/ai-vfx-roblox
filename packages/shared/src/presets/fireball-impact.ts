@@ -51,7 +51,7 @@ export const fireballImpact: Patch = {
           ],
         },
         LightEmission: 1,
-        SpreadAngle: { $type: "Vector3", x: 180, y: 180, z: 0 },
+        SpreadAngle: { $type: "Vector2", x: 180, y: 180 },
       },
     },
     {
@@ -98,7 +98,7 @@ export const fireballImpact: Patch = {
             { time: 1, color: { r: 0.1, g: 0.1, b: 0.1 } },
           ],
         },
-        SpreadAngle: { $type: "Vector3", x: 180, y: 180, z: 0 },
+        SpreadAngle: { $type: "Vector2", x: 180, y: 180 },
       },
     },
     {

@@ -4,6 +4,7 @@
 
 local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
+local ChangeHistoryService = game:GetService("ChangeHistoryService")
 
 --------------------------------------------------------------------------------
 -- CONFIG
@@ -139,6 +140,8 @@ local function resolveValue(value)
 		return Color3.new(value.r, value.g, value.b)
 	elseif typeName == "Vector3" then
 		return Vector3.new(value.x, value.y, value.z)
+	elseif typeName == "Vector2" then
+		return Vector2.new(value.x, value.y)
 	elseif typeName == "NumberRange" then
 		return NumberRange.new(value.min, value.max)
 	elseif typeName == "ColorSequence" then
@@ -177,6 +180,8 @@ end
 function PatchApply.apply(patch)
 	createdInstances = {}
 	local results = { created = {}, errors = {}, warnings = {} }
+
+	local recording = ChangeHistoryService:TryBeginRecording("VFXCopilot: " .. (patch.effectName or "effect"))
 
 	for _, op in ipairs(patch.operations) do
 		local success, err = pcall(function()
@@ -228,6 +233,14 @@ function PatchApply.apply(patch)
 			if op.op == "createInstance" or op.op == "createScript" then
 				break
 			end
+		end
+	end
+
+	if recording then
+		if #results.errors > 0 then
+			ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Cancel)
+		else
+			ChangeHistoryService:FinishRecording(recording, Enum.FinishRecordingOperation.Commit)
 		end
 	end
 
@@ -314,6 +327,12 @@ function PatchApply.spawnPreview(effectFolder, effectName)
 				end
 			end
 		end)
+	end
+
+	-- Auto-focus camera on the preview
+	local cam = game.Workspace.CurrentCamera
+	if cam then
+		cam.CFrame = CFrame.new(previewPart.Position + Vector3.new(5, 3, 5), previewPart.Position)
 	end
 
 	return previewPart
@@ -433,11 +452,24 @@ outputLabel.Parent = screenGui
 local currentPatch = nil
 local checkpoints = {}
 local isConnected = false
+local httpEnabled = HttpService.HttpEnabled
 
 -- Toggle widget visibility
 toggleButton.Click:Connect(function()
 	widget.Enabled = not widget.Enabled
 end)
+
+-- HttpService check
+if not httpEnabled then
+	outputLabel.Text = "HTTP Requests are DISABLED.\n\nTo use VFX Copilot:\n1. Go to Game Settings > Security\n2. Enable 'Allow HTTP Requests'\n3. Restart the plugin"
+	outputLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
+	statusLabel.Text = "HTTP Disabled"
+	statusLabel.TextColor3 = Color3.fromRGB(231, 76, 60)
+	generateBtn.Active = false
+	generateBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 50)
+	applyBtn.Active = false
+	applyBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 50)
+end
 
 --------------------------------------------------------------------------------
 -- HELPERS
@@ -450,7 +482,24 @@ local function findEffectFolder(patch)
 	return resolveOrEnsure(fullPath, false)
 end
 
+local function cleanExistingEffect(patch)
+	local rootPath = patch.rootFolder or "ReplicatedStorage/VFXCopilot/Effects"
+	local fullPath = rootPath .. "/" .. patch.effectName
+	local parts = string.split(fullPath, "/")
+	local current = game
+	for _, part in ipairs(parts) do
+		local child = current:FindFirstChild(part)
+		if not child then return end
+		current = child
+	end
+	-- Clear existing children in the effect folder
+	for _, child in ipairs(current:GetChildren()) do
+		child:Destroy()
+	end
+end
+
 local function applyPatchWithPreview(patch)
+	cleanExistingEffect(patch)
 	local results = PatchApply.apply(patch)
 
 	local previewPart = nil
@@ -502,10 +551,14 @@ generateBtn.MouseButton1Click:Connect(function()
 
 	outputLabel.Text = "Generating..."
 	generateBtn.Text = "Generating..."
+	generateBtn.Active = false
+	applyBtn.Active = false
 
 	local result, err = HttpClient.generate(prompt)
 
 	generateBtn.Text = "Generate"
+	generateBtn.Active = true
+	applyBtn.Active = true
 
 	if err then
 		outputLabel.Text = "Error: " .. tostring(err)
@@ -538,6 +591,8 @@ applyBtn.MouseButton1Click:Connect(function()
 	end
 
 	outputLabel.Text = "Applying patch..."
+	generateBtn.Active = false
+	applyBtn.Active = false
 	local checkpoint, results = applyPatchWithPreview(currentPatch)
 	table.insert(checkpoints, checkpoint)
 
@@ -553,6 +608,8 @@ applyBtn.MouseButton1Click:Connect(function()
 	end
 	table.insert(lines, "Checkpoint saved. Use Revert to undo.")
 	outputLabel.Text = table.concat(lines, "\n")
+	generateBtn.Active = true
+	applyBtn.Active = true
 end)
 
 -- Revert handler
