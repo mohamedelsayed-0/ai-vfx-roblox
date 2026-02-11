@@ -1,7 +1,30 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 *.js.map
-.env
-.env.local
-.DS_Store
 *.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Electron
+packages/ui/out/
+
+# User config (contains API key)
+.vfxcopilot/

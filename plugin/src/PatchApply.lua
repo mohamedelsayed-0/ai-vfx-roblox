@@ -225,4 +225,108 @@ function PatchApply.getCreatedInstances()
 	return createdInstances
 end
 
+-- VFX class check: returns true if an instance needs a BasePart parent to render
+local VFX_CLASSES = {
+	"ParticleEmitter", "Trail", "Beam", "Attachment",
+	"PointLight", "SpotLight", "SurfaceLight", "Sound",
+}
+
+local function isVFXClass(instance)
+	for _, className in ipairs(VFX_CLASSES) do
+		if instance:IsA(className) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Spawn a visible preview in Workspace so the user can see the effect
+-- Returns: previewPart (the Part in Workspace), burstConnection (repeating burst loop)
+function PatchApply.spawnPreview(effectFolder, effectName)
+	-- Ensure Workspace/VFXCopilot/Previews/ exists
+	local wpVFX = game.Workspace:FindFirstChild("VFXCopilot")
+	if not wpVFX then
+		wpVFX = Instance.new("Folder")
+		wpVFX.Name = "VFXCopilot"
+		wpVFX.Parent = game.Workspace
+	end
+	local previews = wpVFX:FindFirstChild("Previews")
+	if not previews then
+		previews = Instance.new("Folder")
+		previews.Name = "Previews"
+		previews.Parent = wpVFX
+	end
+
+	-- Remove old preview with the same name
+	local existing = previews:FindFirstChild(effectName .. "_Preview")
+	if existing then
+		existing:Destroy()
+	end
+
+	-- Create a transparent anchored Part as the host for VFX objects
+	local previewPart = Instance.new("Part")
+	previewPart.Name = effectName .. "_Preview"
+	previewPart.Anchored = true
+	previewPart.CanCollide = false
+	previewPart.Transparency = 1
+	previewPart.Size = Vector3.new(1, 1, 1)
+
+	-- Position at camera focus or origin
+	local camera = game.Workspace.CurrentCamera
+	if camera then
+		previewPart.CFrame = camera.CFrame * CFrame.new(0, 0, -10)
+	else
+		previewPart.Position = Vector3.new(0, 5, 0)
+	end
+
+	previewPart.Parent = previews
+
+	-- Clone the entire effect folder (preserves internal $ref wiring)
+	local clone = effectFolder:Clone()
+
+	-- Move VFX-relevant children from the cloned folder onto the Part
+	for _, child in ipairs(clone:GetChildren()) do
+		if isVFXClass(child) then
+			child.Parent = previewPart
+		end
+	end
+	clone:Destroy()
+
+	-- Auto-trigger burst emitters (Rate = 0) and replay infinitely
+	local burstEmitters = {}
+	for _, child in ipairs(previewPart:GetChildren()) do
+		if child:IsA("ParticleEmitter") and child.Rate == 0 then
+			table.insert(burstEmitters, child)
+		end
+	end
+
+	local burstConnection = nil
+	if #burstEmitters > 0 then
+		-- Emit once immediately
+		for _, emitter in ipairs(burstEmitters) do
+			emitter:Emit(25)
+		end
+		-- Then replay every 2 seconds
+		burstConnection = task.spawn(function()
+			while previewPart and previewPart.Parent do
+				task.wait(2)
+				for _, emitter in ipairs(burstEmitters) do
+					if emitter and emitter.Parent then
+						emitter:Emit(25)
+					end
+				end
+			end
+		end)
+	end
+
+	return previewPart, burstConnection
+end
+
+-- Destroy a preview and stop its burst loop
+function PatchApply.destroyPreview(previewPart)
+	if previewPart and previewPart.Parent then
+		previewPart:Destroy()
+	end
+end
+
 return PatchApply

@@ -18,6 +18,7 @@ export const fireballImpact: Patch = {
       parentPath: "ReplicatedStorage/VFXCopilot/Effects/FireballImpact",
       name: "FireBurst",
       properties: {
+        Enabled: true,
         Rate: 0,
         Lifetime: {
           $type: "NumberSequence",
@@ -60,6 +61,7 @@ export const fireballImpact: Patch = {
       parentPath: "ReplicatedStorage/VFXCopilot/Effects/FireballImpact",
       name: "ImpactSmoke",
       properties: {
+        Enabled: true,
         Rate: 0,
         Lifetime: {
           $type: "NumberSequence",

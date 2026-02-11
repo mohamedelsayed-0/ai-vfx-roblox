@@ -18,6 +18,7 @@ export const dustLandingPuff: Patch = {
       parentPath: "ReplicatedStorage/VFXCopilot/Effects/DustLandingPuff",
       name: "DustCloud",
       properties: {
+        Enabled: true,
         Rate: 0,
         Lifetime: {
           $type: "NumberSequence",
@@ -73,6 +74,7 @@ export const dustLandingPuff: Patch = {
       parentPath: "ReplicatedStorage/VFXCopilot/Effects/DustLandingPuff",
       name: "Pebbles",
       properties: {
+        Enabled: true,
         Rate: 0,
         Lifetime: {
           $type: "NumberSequence",

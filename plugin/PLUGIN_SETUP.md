@@ -30,15 +30,41 @@ The plugin needs to talk to the local backend server on `127.0.0.1:3000`.
 
 1. Start the VFX Copilot CLI:
    ```bash
-   npx tsx packages/cli/bin/vfxcopilot.ts
+   npm run dev
    ```
 2. In Roblox Studio, click the **VFX Copilot** button in the toolbar
 3. The plugin panel should show a green **Connected** status
 4. Try generating from the CLI or UI — the plugin will auto-apply when you run `/apply`
 
+## 4. How Effects Appear
+
+When you apply an effect:
+
+- **Template** is saved to `ReplicatedStorage/VFXCopilot/Effects/<EffectName>/` (for reuse via `EffectController`)
+- **Live preview** is auto-spawned on a transparent Part at `Workspace/VFXCopilot/Previews/<EffectName>_Preview`
+- Burst effects (explosions, impacts) **auto-replay every 2 seconds** so you can see them
+- Continuous effects (trails, sparks) emit immediately
+
+When you **Revert**, both the template and the Workspace preview are removed.
+
+## 5. Using Effects in Your Game
+
+Each effect includes an `EffectController` ModuleScript. To use in a script:
+
+```lua
+local EffectController = require(game.ReplicatedStorage.VFXCopilot.Effects.MyEffect.EffectController)
+
+-- Spawn effect on a part
+local effect = EffectController.Create(workspace.SomePart)
+
+-- Later, clean up
+EffectController.Destroy(effect)
+```
+
 ## Troubleshooting
 
-- **"Disconnected" status**: Make sure the CLI is running (`npx tsx packages/cli/bin/vfxcopilot.ts`)
+- **"Disconnected" status**: Make sure the CLI is running (`npm run dev`)
 - **HTTP errors**: Verify HTTP Requests are enabled in Game Settings > Security
 - **Plugin not appearing**: Restart Studio after placing files in the plugins folder
+- **Effects not visible**: Effects preview at camera position. Move camera to `Workspace/VFXCopilot/Previews/` to find them
 - **Auto-apply not working**: The plugin polls every 2 seconds. Run `/apply` in the CLI or UI, and the effect should appear in Studio within a few seconds

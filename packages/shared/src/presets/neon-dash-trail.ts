@@ -74,6 +74,7 @@ export const neonDashTrail: Patch = {
       parentPath: "ReplicatedStorage/VFXCopilot/Effects/NeonDashTrail",
       name: "SpeedSparks",
       properties: {
+        Enabled: true,
         Rate: 80,
         Lifetime: {
           $type: "NumberSequence",
@@ -101,6 +102,13 @@ export const neonDashTrail: Patch = {
           keypoints: [
             { time: 0, color: { r: 0, g: 1, b: 1 } },
             { time: 1, color: { r: 0.3, g: 0.3, b: 1 } },
+          ],
+        },
+        Transparency: {
+          $type: "NumberSequence",
+          keypoints: [
+            { time: 0, value: 0 },
+            { time: 1, value: 1 },
           ],
         },
         LightEmission: 1,

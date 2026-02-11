@@ -175,6 +175,56 @@ generateBtn.MouseButton1Click:Connect(function()
 	outputLabel.Text = table.concat(lines, "\n")
 end)
 
+-- Helper: find the effect folder in ReplicatedStorage after applying a patch
+local function findEffectFolder(patch)
+	local effectName = patch.effectName
+	local rootPath = patch.rootFolder or "ReplicatedStorage/VFXCopilot/Effects"
+	local parts = string.split(rootPath .. "/" .. effectName, "/")
+	local current = game
+	for _, part in ipairs(parts) do
+		local child = current:FindFirstChild(part)
+		if not child then return nil end
+		current = child
+	end
+	return current
+end
+
+-- Helper: apply patch + spawn preview, returns checkpoint data
+local function applyPatchWithPreview(patch)
+	local results = PatchApply.apply(patch)
+
+	-- Spawn visible preview in Workspace
+	local previewPart = nil
+	if #results.errors == 0 then
+		local effectFolder = findEffectFolder(patch)
+		if effectFolder then
+			previewPart = PatchApply.spawnPreview(effectFolder, patch.effectName or "effect")
+		end
+	end
+
+	return {
+		patch = patch,
+		created = results.created,
+		createdInstances = results.createdInstances,
+		previewPart = previewPart,
+	}, results
+end
+
+-- Helper: revert a checkpoint (destroy template + preview)
+local function revertCheckpoint(cp)
+	local count = 0
+	for _, inst in ipairs(cp.created) do
+		if inst and inst.Parent then
+			inst:Destroy()
+			count = count + 1
+		end
+	end
+	if cp.previewPart then
+		PatchApply.destroyPreview(cp.previewPart)
+	end
+	return count
+end
+
 -- Apply handler
 applyBtn.MouseButton1Click:Connect(function()
 	if not currentPatch then
@@ -183,14 +233,8 @@ applyBtn.MouseButton1Click:Connect(function()
 	end
 
 	outputLabel.Text = "Applying patch..."
-	local results = PatchApply.apply(currentPatch)
-
-	-- Create checkpoint
-	table.insert(checkpoints, {
-		patch = currentPatch,
-		created = results.created,
-		createdInstances = results.createdInstances,
-	})
+	local checkpoint, results = applyPatchWithPreview(currentPatch)
+	table.insert(checkpoints, checkpoint)
 
 	local lines = { "Applied: " .. currentPatch.effectName }
 	if #results.errors > 0 then
@@ -200,6 +244,7 @@ applyBtn.MouseButton1Click:Connect(function()
 		end
 	else
 		table.insert(lines, "Created " .. #results.created .. " objects.")
+		table.insert(lines, "Preview spawned in Workspace/VFXCopilot/Previews/")
 	end
 	table.insert(lines, "Checkpoint saved. Use Revert to undo.")
 	outputLabel.Text = table.concat(lines, "\n")
@@ -213,14 +258,8 @@ revertBtn.MouseButton1Click:Connect(function()
 	end
 
 	local cp = table.remove(checkpoints)
-	local count = 0
-	for _, inst in ipairs(cp.created) do
-		if inst and inst.Parent then
-			inst:Destroy()
-			count = count + 1
-		end
-	end
-	outputLabel.Text = "Reverted: " .. cp.patch.effectName .. "\nRemoved " .. count .. " objects."
+	local count = revertCheckpoint(cp)
+	outputLabel.Text = "Reverted: " .. cp.patch.effectName .. "\nRemoved " .. count .. " objects + preview."
 	currentPatch = nil
 end)
 
@@ -231,13 +270,8 @@ local function pollActions()
 			local action, err = HttpClient.getPendingAction()
 			if action and action.action == "apply" and action.patch then
 				outputLabel.Text = "Auto-applying from CLI..."
-				local results = PatchApply.apply(action.patch)
-
-				table.insert(checkpoints, {
-					patch = action.patch,
-					created = results.created,
-					createdInstances = results.createdInstances,
-				})
+				local checkpoint, results = applyPatchWithPreview(action.patch)
+				table.insert(checkpoints, checkpoint)
 				currentPatch = action.patch
 
 				local lines = { "Auto-applied: " .. (action.patch.effectName or "effect") }
@@ -248,6 +282,7 @@ local function pollActions()
 					end
 				else
 					table.insert(lines, "Created " .. #results.created .. " objects.")
+					table.insert(lines, "Preview spawned in Workspace/VFXCopilot/Previews/")
 				end
 				outputLabel.Text = table.concat(lines, "\n")
 				HttpClient.confirmAction()
@@ -255,14 +290,8 @@ local function pollActions()
 			elseif action and action.action == "revert" then
 				if #checkpoints > 0 then
 					local cp = table.remove(checkpoints)
-					local count = 0
-					for _, inst in ipairs(cp.created) do
-						if inst and inst.Parent then
-							inst:Destroy()
-							count = count + 1
-						end
-					end
-					outputLabel.Text = "Auto-reverted from CLI.\nRemoved " .. count .. " objects."
+					local count = revertCheckpoint(cp)
+					outputLabel.Text = "Auto-reverted from CLI.\nRemoved " .. count .. " objects + preview."
 					currentPatch = nil
 				end
 				HttpClient.confirmAction()
