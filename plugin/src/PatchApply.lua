@@ -275,14 +275,14 @@ function PatchApply.spawnPreview(effectFolder, effectName)
 	end
 
 	-- Remove old preview with the same name
-	local existing = previews:FindFirstChild(effectName .. "_Preview")
+	local existing = previews:FindFirstChild(effectName)
 	if existing then
 		existing:Destroy()
 	end
 
 	-- Create a transparent anchored Part as the host for VFX objects
 	local previewPart = Instance.new("Part")
-	previewPart.Name = effectName .. "_Preview"
+	previewPart.Name = effectName
 	previewPart.Anchored = true
 	previewPart.CanCollide = false
 	previewPart.Transparency = 1

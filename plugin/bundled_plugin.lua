@@ -263,11 +263,11 @@ function PatchApply.spawnPreview(effectFolder, effectName)
 		previews.Parent = wpVFX
 	end
 
-	local existing = previews:FindFirstChild(effectName .. "_Preview")
+	local existing = previews:FindFirstChild(effectName)
 	if existing then existing:Destroy() end
 
 	local previewPart = Instance.new("Part")
-	previewPart.Name = effectName .. "_Preview"
+	previewPart.Name = effectName
 	previewPart.Anchored = true
 	previewPart.CanCollide = false
 	previewPart.Transparency = 1
