@@ -136,6 +136,20 @@ All emitters Rate=0 (burst only, triggered by :Emit()):
 - Sparkles: Rate=30-60, Size=0.2-0.8, Speed=2-5, Lifetime=0.3-1.0s, Drag=3, RotSpeed min=-360 max=360, Texture=sparkles_main, SpreadAngle=180/180
 - Color shift: Use 3+ ColorSequence keypoints for rainbow/shifting effect
 
+### ENERGY SPHERE / SPIRIT BOMB / CHARGED ATTACK
+Use 4-5 layers. CRITICAL: the core glow must NOT be too large or it washes out the entire effect.
+1. Core glow: Rate=8-12, Size=2-3 (NOT bigger!), Speed=0.5-1, Lifetime=0.8-1.5s, LightEmission=1, Texture=radial_gradient, LockedToPart=true, Orientation=FacingCamera, ZOffset=2, Transparency starts at 0.2 ends at 0.8, Color=white fading to main color
+2. Energy wisps: Rate=15-25, Size=1-2, Speed=1-3, Lifetime=0.5-1s, LightEmission=1, Texture=smoke_main, SpreadAngle=30/30, Drag=3, ZOffset=1, Color=main color, LockedToPart=true
+3. Orbiting fragments: Rate=25-40, Size=0.3-0.8, Speed=4-8, Lifetime=0.3-0.8s, Drag=6, SpreadAngle=180/180, Texture=sparkles_main, RotSpeed min=-360 max=360, ZOffset=0, Color=dark/contrasting color, LightEmission=0.3-0.5 (NOT 0 or they become opaque blobs)
+4. Energy streaks: Use 2 Beams with different angles — Attachment positions offset by 3-4 studs, Width0=0.3 Width1=0.1, LightEmission=1, Color=bright main color, Segments=1 (straight lines)
+5. Light: PointLight, Brightness=4-6 (NOT 10+), Range=15-20, Color=main color
+
+IMPORTANT for energy spheres:
+- Core glow Size must stay 2-3. Larger sizes create a white blob that hides all other layers.
+- Dark/contrasting fragments MUST have LightEmission >= 0.3 or they look like opaque smoke blobs.
+- PointLight Brightness should be 4-6, NOT 10+. Too bright washes out the scene.
+- Use ZOffset to layer: core=2, wisps=1, fragments=0, so the glow renders in front of fragments.
+
 ### HEALING / BUFF
 - Rising particles: Rate=20-40, Size=0.3-1.0 shrinking, Speed=3-6, Lifetime=1-2s, Acceleration y=2, Texture=sparkles_main, Color=green/gold, LightEmission=1, SpreadAngle=20/20
 - Soft glow: Rate=5-10, Size=2-4, Speed=0.5, Lifetime=1.5s, LightEmission=1, Texture=radial_gradient, Color=soft green/white
@@ -217,6 +231,14 @@ return module
 - Always fade particles out with Transparency NumberSequence ending at 1
 - Size should start at the desired size and shrink to 0 (or grow for explosions)
 - Layer effects with ZOffset: background layer ZOffset=-1, foreground ZOffset=1
+
+## CRITICAL: Avoid Common Mistakes
+
+- NEVER make glow/core particles larger than Size 3. Oversized glow particles create a white blob that hides all other layers.
+- NEVER use LightEmission=0 on dark-colored particles unless you want opaque smoke. Dark particles with LightEmission=0 block everything behind them. Use LightEmission=0.3-0.5 for dark energy/fragments so they remain semi-transparent.
+- NEVER set PointLight Brightness above 8 for ambient effects. High brightness washes out the entire scene.
+- ALWAYS ensure no single particle layer dominates. Each layer should be visible alongside others.
+- Glow layers need ZOffset HIGHER than detail layers, otherwise details render behind the glow and are invisible.
 
 ## Example: Neon Sword Slash
 
