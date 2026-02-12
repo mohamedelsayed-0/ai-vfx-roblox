@@ -117,30 +117,200 @@ Emission shape properties (use for auras, shields, area effects):
 Particle deformation:
 - Squash: NumberSequence (stretches particles. Positive = tall/thin, Negative = wide/flat. Use 0.5-2 for spark stretching along velocity. Great with VelocityPerpendicular orientation)
 
+## PROMPT INTERPRETATION — How to Parse User Intent
+
+Before generating, classify the user's request into an archetype. This determines emission mode, scale, and structure.
+
+### Keyword-to-Archetype Mapping
+| Keywords | Archetype | Emission | Scale | Attach To |
+|----------|-----------|----------|-------|-----------|
+| slash, swing, cut, cleave, slice, katana, blade | MELEE_SKILL | burst per swing | weapon-length (3-5 studs trail width) | weapon Part |
+| dash, sprint, speed, rush, flash step, blink | MOVEMENT_TRAIL | continuous while active | character-fitted (2-3 stud trail width) | HumanoidRootPart |
+| explosion, blast, boom, detonate, impact, shockwave | IMPACT_BURST | burst (Rate=0, :Emit()) | 5-20 studs radius | ground/impact point |
+| fireball, projectile, bullet, orb, missile, energy ball | PROJECTILE | continuous while flying | 1-3 stud core diameter | projectile Part |
+| aura, field, charge, power up, transform, ki, chakra | PERSISTENT_FIELD | continuous (Rate > 0) | body-surrounding (4-7 studs) | HumanoidRootPart |
+| fire, flame, burn, ignite, torch, campfire | ELEMENTAL_FIRE | continuous | source-dependent (1-5 studs) | source Part |
+| smoke, dust, fog, mist, steam, exhaust | ATMOSPHERIC | continuous, low rate | area-filling (5-20 studs) | source Part |
+| heal, buff, shield, protect, regen, bless | SUPPORT_EFFECT | continuous while active | body-surrounding, gentle | HumanoidRootPart |
+| lightning, thunder, electric, shock, zap | ELECTRIC_DISCHARGE | burst or rapid flicker | 3-10 studs, branching | origin Part |
+| beam, laser, ray, channel | CHANNELED_BEAM | continuous while channeling | long and narrow (10-30 studs) | origin + target Attachments |
+| portal, rift, warp, teleport, summon | SPATIAL_ANOMALY | continuous, looping | 3-8 stud diameter | ground/air anchor |
+| ice, frost, freeze, crystal, snow | ELEMENTAL_ICE | burst or continuous | sharp, geometric, small-to-medium | source Part |
+| dark, shadow, void, corrupt, death | DARK_ENERGY | continuous, menacing | variable, swirling inward | HumanoidRootPart or source |
+
+### Ambiguity Resolution
+- Vague prompt ("cool effect", "something epic"): default to a visually impressive PERSISTENT_FIELD aura with 3-4 layers
+- "Anime style" mentioned: increase saturation, exaggerate sizes 1.5-2x, add speed lines and impact flashes
+- "Realistic" mentioned: reduce LightEmission, increase Drag, muted colors, more smoke, no shockwave rings
+- Multiple keywords ("flaming sword slash"): combine archetypes — MELEE_SKILL primary + ELEMENTAL_FIRE secondary
+- Named reference ("Gojo's infinity", "Kamehameha", "Rasengan"): map to closest archetype and match the visual style
+
+### Intent Checklist (resolve ALL before generating)
+1. WHAT archetype(s) does this map to?
+2. WHEN does it play — burst (once) or continuous (while active)?
+3. WHERE is it attached — weapon, body, ground, projectile?
+4. HOW BIG — weapon-scale, body-scale, or area-scale?
+5. HOW LONG does it persist — flash (0.1-0.5s), brief (0.5-2s), sustained (indefinite)?
+
+## EFFECT BEHAVIOR RULES — Emission, Scale, and Lifecycle
+
+### Continuous vs Burst Decision
+- CONTINUOUS (Rate > 0): auras, dash trails, fire, smoke, channeled beams, persistent fields. Auto-play when parented. EffectController uses simple Clone+Parent.
+- BURST (Rate = 0): explosions, impacts, slash hits, landing puffs. Need :Emit(N) in EffectController.Create().
+- HYBRID: Continuous base + burst accents. E.g. fire aura (continuous) with pulse on activation (burst overlay). Use Rate > 0 on base layers + Rate = 0 on accent layers.
+
+### Scale Reference (Roblox Units)
+- Character height: ~5 studs. HumanoidRootPart center: ~3 studs above ground.
+- Sword/weapon length: 3-5 studs
+- Fist/hand effect: 1-2 studs
+- Body aura radius: 4-7 studs (centered on HumanoidRootPart)
+- Ground slam / landing: 8-15 stud radius
+- Projectile core: 1-3 studs
+- Projectile trail width: 0.5-1.5 studs
+- Large explosion: 10-20 studs radius
+- Small impact sparks: 2-5 stud scatter
+- Room-scale atmosphere: 20-40 studs
+
+### Attachment Conventions
+- Weapon effects (slash, glow): Attachment0 at blade tip, Attachment1 at hilt
+- Body auras: Attach to HumanoidRootPart. Use Shape=Sphere for volume emission
+- Ground effects: Part at ground level. EmissionDirection=Top. Shape=Disc or Box
+- Projectiles: Attach to projectile Part. LockedToPart=true for core, VelocityInheritance=0.5-1.0 for wake particles
+- Camera effects: ColorCorrectionEffect/BloomEffect in Lighting — no physical attachment
+
+### Lifecycle Patterns
+- ONE-SHOT: Create → Emit → particles expire → Destroy. For impacts/explosions. EffectController uses task.delay for auto-cleanup.
+- PERSISTENT: Create and leave active indefinitely. For auras, environmental fire. User calls Destroy() when done.
+- TRIGGER-REPEAT: Container stays alive, :Emit() called each activation. For weapon hits — effect folder persists, triggers per swing.
+
+## VISUAL REFERENCE KNOWLEDGE — What Effects Should Look Like
+
+### Anime Sword Slash
+- Visual: A bright crescent arc that lingers briefly. White/blue inner edge, colored outer edge. Afterimage trail behind the blade path. Brief spark burst on contact.
+- Implementation: Wide Trail (Attachment spread 3-4 studs), short Lifetime (0.15-0.3s), tapering WidthScale, LightEmission=1. Small fast spark particles at the slash point. Optional PointLight flash on impact.
+- Key feel: FAST, SHARP, CLEAN. Trail appears and vanishes quickly. Not smoky or cloudy.
+
+### Anime Explosion (DBZ / Naruto style)
+- Visual: Dramatic radial burst from center. Bright white/yellow core expanding outward. Multiple shockwave rings rippling out. Debris flying in arcs. Dust cloud settling. Brief screen flash.
+- Implementation: Fire burst (Emit 30-50, high Speed, SpreadAngle 180/180) + shockwave ring (Emit 1, Size grows fast, Speed=0) + debris chunks (Emit 15-25, gravity arc Acceleration y=-20) + lingering smoke (Emit 10-15, growing Size, slow) + PointLight flash Brightness=10-15. Optional BloomEffect in Lighting.
+- Key feel: OVERWHELMING, DRAMATIC, LAYERED. Multiple waves of visual info — not a single puff. Each layer should be visible.
+
+### Dash / Speed Movement
+- Visual: Ghosting/afterimage effect. Wind particles streaming backward from the character. Elongated horizontal speed lines. Brief dust kick at start position.
+- Implementation: Trail on character (very short Lifetime 0.1-0.2s). Speed line particles: Orientation=VelocityPerpendicular, Squash=2-3, Lifetime=0.05-0.15s, LockedToPart=true, high Rate=100-200. Optional ground dust burst at origin (Rate=0, Emit on dash start).
+- Key feel: SPEED, HORIZONTAL, FLEETING. Everything suggests forward velocity. Particles stretch along movement direction. No vertical spread.
+
+### Energy Aura / Power Up
+- Visual: Pulsing energy field enveloping the character. Rising particles like flames or sparks. Inner glow illuminating the character. Optional ground ring or cracks.
+- Implementation: Inner glow (forcefield_glow, LockedToPart, Shape=Sphere), outer rising particles (sparkles_main, Acceleration y=3-5), optional swirling fragments (forcefield_vortex, Shape=Sphere, ShapeInOut=InAndOut). PointLight for character illumination.
+- Key feel: POWERFUL, SUSTAINED, ENVELOPING. Character radiates energy. Not sparse — the effect should feel dense and impactful.
+
+### Fireball / Energy Projectile
+- Visual: Bright concentrated core with a trailing wake of fire/energy. Core is spherical and tight. Wake fans out behind, dissipating. Embers scatter off the surface.
+- Implementation: Core glow (forcefield_glow, Size 1-2, LockedToPart=true, ZOffset=2). Fire wake (fire_main, Rate=80-120, Speed=2-4 backward, Lifetime=0.3-0.6s, NOT LockedToPart — particles trail behind as projectile moves). Spark scatter (sparkles_main, Rate=30-50, SpreadAngle=40/40). PointLight on projectile.
+- Key feel: CONCENTRATED core, DISPERSING wake. Front is tight and bright. Back is chaotic and fading.
+
+### Healing / Buff
+- Visual: Gentle rising sparkles and soft orbs. Warm green/gold/white colors. Soft glow around character. Peaceful, not aggressive.
+- Implementation: Slow rising sparkles (Speed=2-4, Acceleration y=2, Drag=1, Rate=20-30). Soft glow (forcefield_glow, large but very transparent, LockedToPart). Gentle sizes — start medium, shrink slowly. Low Brightness=2-3.
+- Key feel: GENTLE, WARM, RISING. Particles drift upward peacefully. Not explosive or harsh.
+
+### Lightning / Electric Discharge
+- Visual: Jagged bright lines flickering rapidly. Electric arcs between points. Brief and intense. Dim afterimage trace lingers.
+- Implementation: Multiple Beams with CurveSize0/CurveSize1=2-5 for jagged shapes, Segments=15-20. Very bright: LightEmission=1, LightInfluence=0, Brightness=4-5. Scattered spark particles (sparkles_main, Speed=15-25, Lifetime=0.05-0.15s, VelocityPerpendicular). PointLight flicker.
+- Key feel: JAGGED, BRIGHT, INSTANT. Electric effects are fast and sharp, never smooth or flowing.
+
+### Dark / Shadow / Void Energy
+- Visual: Inward-pulling particles. Dark purple/black with occasional bright accent edges (magenta, sickly green, pale cyan). Swirling, ominous. Wisps reaching and curling.
+- Implementation: Dark fragments (forcefield_vortex, dark purple/black, LightInfluence=0, Brightness=1-2, Shape=Sphere, ShapeInOut=Inward). Accent sparks (sparkles_main, contrasting bright color, low Rate=5-10, small Size). Ambient smoke (smoke_main, dark, slow rising).
+- Key feel: OMINOUS, PULLING INWARD, CONTRASTING. Draw attention with dark-and-bright contrast — not pure blackness.
+
+## STYLE GUIDE — How Style Modifiers Affect Generation
+
+When the user specifies a style, apply these modifications ON TOP of the base archetype:
+
+### "anime" / "anime-style" (THIS IS THE DEFAULT if no style specified)
+- Colors: HIGH saturation, vivid, contrasting (cyan+magenta, gold+deep blue, red+white)
+- Color transitions: SHARP keypoint changes, 3+ close keypoints, not gradual blends
+- Sizes: Exaggerated 1.5-2x normal. Bigger trails, bigger bursts
+- Speed: Fast particles, short lifetimes. Punchy and dramatic
+- Extras: Speed lines (VelocityPerpendicular thin particles), impact flashes (PointLight burst), shockwave rings
+- LightEmission: Always 1. Everything glows
+- DEFAULT: When no style is specified, use anime style — Roblox games favor stylized VFX
+
+### "realistic" / "grounded"
+- Colors: Desaturated, natural tones. Fire=orange-to-brown, smoke=gray not black
+- Sizes: Physically plausible. No oversized glows
+- Speed/Lifetime: Longer smoke lifetimes (3-5s), more Drag (3-6), gravity Acceleration y=-10 to -20
+- LightEmission: Low 0-0.3. Only actual flames glow
+- Textures: Primarily smoke_main and fire_main
+- Remove: No speed lines, no shockwave rings, no screen effects
+
+### "cyberpunk" / "neon" / "sci-fi"
+- Colors: Neon cyan, magenta, electric blue, hot pink, lime green. 2-3 contrasting neon colors
+- ALL particles: LightInfluence=0, Brightness=3-5 (everything self-illuminated)
+- Extras: Geometric beam accents (straight Beams, Segments=1), clean lines
+- Textures: Prefer sparkles_main and forcefield_glow_main for geometric feel
+
+### "dark fantasy" / "gothic" / "shadow"
+- Colors: Dark purples, deep reds, blacks + bright accent highlights (magenta, sickly green, pale blue)
+- Textures: forcefield_vortex_main for swirling dark energy
+- Dark particles: MUST use LightInfluence=0 + Brightness=1-2
+- Movement: Slower, ominous. Speed=1-4, Lifetime=1-3s
+- Extras: Ambient wisps (smoke_main, Rate=3-5, dark, rising slowly)
+
+### "fire" / "infernal" / "volcanic"
+- Colors: Deep red core → bright orange → yellow tips. 4+ ColorSequence keypoints
+- Textures: fire_main (flames), fire_sparks_main (embers), smoke_main (smoke layer)
+- ALWAYS include: smoke layer (gray/dark, rising) + ember layer (small, falling with gravity)
+
+### "ice" / "frost" / "crystal"
+- Colors: White core, light blue edges, subtle cyan accents
+- Particles: sparkles_main for crystals (RotSpeed for tumbling), smoke_main with blue tint for frost mist
+- Movement: Slow outward or falling. Speed=1-3, Acceleration y=-2 to -5
+- PointLight: Pale blue for cold illumination. Small sharp particles, not blobby.
+
+### "holy" / "divine" / "celestial"
+- Colors: Gold, white, soft yellow. Pale blue accents
+- Textures: sparkles_main for stars, forcefield_glow_main for halo
+- Movement: Gentle rising (Acceleration y=2-3), low Speed
+- Extras: Subtle light rays (thin angled Beams from center)
+- LightEmission: 1. Brightness=3-4 for warm golden glow
+
 ## VFX RECIPES — Use These Patterns
 
 ### AURA / ENERGY FIELD
+Context: Persistent effect surrounding a character during power-up, transformation, or channeled ability. Stays active indefinitely. Attach to HumanoidRootPart. Character should look like they are radiating energy.
+When to use: "aura", "power up", "transform", "charge", "energy field", "ki", "chakra", "mana shield", "barrier", "super saiyan"
 Use 2-3 overlapping ParticleEmitters for depth:
 1. Inner glow: Rate=40, Size=2-4, Speed=1-3, Lifetime=1-2s, LightInfluence=0, Brightness=3, LockedToPart=true, Orientation=FacingCamera, Texture=forcefield_glow_main, low SpreadAngle (10-20), Shape=Sphere, ShapeStyle=Volume
 2. Outer particles: Rate=20-30, Size=0.5-1.5, Speed=2-5, Lifetime=0.5-1.5s, LightInfluence=0, Brightness=2, Drag=3, Texture=sparkles_main, higher SpreadAngle (40-60), Acceleration y=2-4 (rising), Shape=Sphere, ShapeInOut=Outward
 3. Optional ground ring: Rate=15, Size=1-2, Speed=0.5-1, SpreadAngle=360/0, Orientation=FacingCamera, Shape=Disc
 
 ### SWORD SLASH / MELEE
+Context: Brief weapon skill VFX that plays once per swing/attack. Lasts 0.2-0.5 seconds. Attach to weapon Part. The arc follows the weapon's swing path. Must feel fast and sharp — the defining visual of a melee hit.
+When to use: "slash", "cut", "swing", "cleave", "slice", "katana", "blade", "sword", "axe chop", "melee hit"
 - Trail: wide WidthScale (1 tapering to 0), short Lifetime (0.15-0.3s), bright Color fading to transparent, high LightEmission
 - Spark particles: Rate=80-150, Size=0.1-0.3, Speed=8-15, Lifetime=0.1-0.4s, Orientation=VelocityPerpendicular, Drag=5, SpreadAngle=60/60, Texture=sparkles_main
 - Impact glow: PointLight with Brightness=5-8, Range=10-15
 - Attachment0 position (0, 1.5, 0), Attachment1 position (0, -1.5, 0) for good trail width
 
 ### FIRE / FLAMES
+Context: Ongoing combustion on an object, surface, or character. Can be environmental (campfire, torch) or combat (burning enemy, fire punch). Size depends on source — torch is small (Size 1-2), bonfire is large (Size 3-5). Always include a smoke layer for realism.
+When to use: "fire", "flame", "burn", "ignite", "torch", "campfire", "inferno", "blaze", "combustion"
 - Main fire: Rate=60-100, Size=1-3 (growing then shrinking), Speed=3-6, Lifetime=0.5-1.5s, Acceleration y=3, Drag=1, EmissionDirection=Top, Orientation=VelocityParallel, Texture=fire_main, Color from yellow to orange to dark red, LightEmission=1
 - Ember sparks: Rate=20-40, Size=0.1-0.3, Speed=5-10, Lifetime=0.5-1.0s, Acceleration y=2, Drag=2, SpreadAngle=30/30, Texture=sparkles_main
 - Heat distortion: Optional smoke layer with low opacity
 
 ### SMOKE / DUST / FOG
+Context: Atmospheric or aftermath effect. Often secondary to another effect (smoke after explosion, dust on landing). Adds realism and weight. Keep subtle unless it IS the primary effect.
+When to use: "smoke", "dust", "fog", "mist", "steam", "exhaust", "aftermath", "landing dust", "sandstorm"
 - Main smoke: Rate=15-30, Size=2-5 (growing), Speed=1-4, Lifetime=2-4s, Drag=2, Acceleration y=1-2, Texture=smoke_main, Color=gray tones, LightEmission=0, SpreadAngle=20/20
 - Rotation: RotSpeed min=-90 max=90 for tumbling, Rotation min=0 max=360 for random start
 
 ### EXPLOSION / IMPACT BURST
+Context: Single dramatic burst that plays once — the signature moment of destruction. MUST be multi-layered (fire + shockwave + debris + smoke + light flash) to feel impactful. Scale to the cause: grenade=5-8 studs, large explosion=10-20 studs, nuke=20-40 studs. For anime style, exaggerate everything.
+When to use: "explosion", "blast", "impact", "boom", "detonate", "shockwave", "burst", "nuke", "grenade", "meteor impact"
 All emitters Rate=0 (burst only, triggered by :Emit()):
 - Fire burst: Emit(30), Size starts big shrinks to 0, Speed=15-25, Lifetime=0.3-0.8s, SpreadAngle=180/180, Texture=fire_main
 - Smoke cloud: Emit(15), Size grows, Speed=3-6, Lifetime=1-3s, Drag=5, Texture=smoke_main
@@ -148,16 +318,22 @@ All emitters Rate=0 (burst only, triggered by :Emit()):
 - Shockwave ring: Emit(1), Size starts small grows large, Speed=0, Lifetime=0.3s, Texture=radial_gradient
 
 ### DASH TRAIL / SPEED LINES
+Context: Active while the character is dashing/sprinting. CONTINUOUS emission (Rate > 0) — particles emit constantly while the dash is happening. Horizontal emphasis — everything should suggest forward velocity. Fitted to character body width (~2-3 stud trail width). The effect auto-plays when parented and stops when destroyed.
+When to use: "dash", "sprint", "speed", "rush", "flash step", "blink", "teleport trail", "speed boost", "quick step"
 - Trail: Lifetime=0.2-0.5s, WidthScale tapering, Color=bright neon, LightEmission=1
 - Speed particles: Rate=100-200, Size=0.05-0.2, Speed=0.5-2, Lifetime=0.1-0.3s, Orientation=VelocityPerpendicular, LockedToPart=true
 - Wind lines: Beam with thin Width0/Width1, long segments
 
 ### MAGIC / SPARKLE
+Context: Generic magical effect — casting a spell, enchanting an object, magical ambient. Versatile archetype adaptable to many contexts. Usually involves sparkles, soft glow, and color shifting. Feels mysterious and ethereal.
+When to use: "magic", "sparkle", "enchant", "spell", "arcane", "mystic", "fairy", "pixie dust", "constellation", "star magic"
 - Core glow: Rate=10-20, Size=1-3, Speed=0.5-2, Lifetime=1-2s, LightEmission=1, Texture=radial_gradient, LockedToPart=true
 - Sparkles: Rate=30-60, Size=0.2-0.8, Speed=2-5, Lifetime=0.3-1.0s, Drag=3, RotSpeed min=-360 max=360, Texture=sparkles_main, SpreadAngle=180/180
 - Color shift: Use 3+ ColorSequence keypoints for rainbow/shifting effect
 
 ### ENERGY SPHERE / SPIRIT BOMB / CHARGED ATTACK
+Context: Concentrated sphere of energy being charged or held (spirit bomb, rasengan, genkidama). Hovers in place or in character's hands. Should look dense, powerful, and multi-layered. Usually grows during charge phase. PERSISTENT emission — active while charging.
+When to use: "energy ball", "spirit bomb", "rasengan", "charged attack", "energy sphere", "orb", "ki blast charge", "concentrated energy"
 Use 4-5 layers. CRITICAL: the core glow must NOT be too large or it washes out the entire effect.
 1. Core glow: Rate=8-12, Size=2-3 (NOT bigger!), Speed=0.5-1, Lifetime=0.8-1.5s, LightInfluence=0, Brightness=3-4, Texture=forcefield_glow_main, LockedToPart=true, Orientation=FacingCamera, ZOffset=2, Transparency starts at 0.2 ends at 0.8, Color=white fading to main color, Shape=Sphere, ShapeStyle=Volume
 2. Energy wisps: Rate=15-25, Size=1-2, Speed=1-3, Lifetime=0.5-1s, LightInfluence=0, Brightness=2-3, Texture=smoke_main, SpreadAngle=30/30, Drag=3, ZOffset=1, Color=main color, LockedToPart=true, Shape=Sphere, ShapeInOut=InAndOut (orbiting look)
@@ -174,6 +350,8 @@ IMPORTANT for energy spheres:
 - Use ZOffset to layer: core=2, wisps=1, fragments=0, so the glow renders in front of fragments.
 
 ### HEALING / BUFF
+Context: Supportive/restorative effect on a character. Must feel gentle and positive — the opposite of combat VFX. Particles rise upward (healing energy ascending). Color indicates type: green=health, gold=buff/holy, blue=mana/shield. PERSISTENT while buff is active.
+When to use: "heal", "healing", "regen", "buff", "restore", "revive", "cleanse", "purify", "bless", "shield buff"
 - Rising particles: Rate=20-40, Size=0.3-1.0 shrinking, Speed=3-6, Lifetime=1-2s, Acceleration y=2, Texture=sparkles_main, Color=green/gold, LightEmission=1, SpreadAngle=20/20
 - Soft glow: Rate=5-10, Size=2-4, Speed=0.5, Lifetime=1.5s, LightEmission=1, Texture=radial_gradient, Color=soft green/white
 
