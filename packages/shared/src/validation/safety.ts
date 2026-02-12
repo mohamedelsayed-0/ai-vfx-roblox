@@ -53,7 +53,7 @@ export function validatePatch(patch: Patch): ValidationResult {
   // Path restrictions
   for (const op of patch.operations) {
     for (const p of extractPaths(op)) {
-      if (!ALLOWED_ROOTS.some((root) => p.startsWith(root))) {
+      if (!ALLOWED_ROOTS.some((root) => p.startsWith(root) || p === root.replace(/\/$/, ""))) {
         errors.push(`Path outside allowed roots: ${p}`);
       }
       if (p.includes("..")) {
@@ -72,7 +72,7 @@ export function validatePatch(patch: Patch): ValidationResult {
         errors.push(`Unknown or disallowed className: "${op.className}" in ${op.name}`);
       }
       // Restrict Lighting path to allowed post-processing classes
-      if (op.parentPath.startsWith("Lighting/") && !ALLOWED_LIGHTING_CLASSES.includes(op.className)) {
+      if ((op.parentPath === "Lighting" || op.parentPath.startsWith("Lighting/")) && !ALLOWED_LIGHTING_CLASSES.includes(op.className)) {
         errors.push(`Class "${op.className}" not allowed in Lighting. Only post-processing effects permitted.`);
       }
     }
