@@ -7,6 +7,7 @@ import { createApplyCommand } from "./commands/apply.js";
 import { createRevertCommand } from "./commands/revert.js";
 import { createConfigCommand } from "./commands/config.js";
 import { createPresetsCommand } from "./commands/presets.js";
+import { createModifyCommand } from "./commands/modify.js";
 import { startRepl } from "./repl/repl.js";
 import { startWsServer, stopWsServer, broadcast, onCommand } from "./ui/ws-server.js";
 import { launchUI, killUI } from "./ui/launch.js";
@@ -47,6 +48,7 @@ export async function main(): Promise<void> {
   // Register commands
   registry.register(createHelpCommand(registry));
   registry.register(createGenerateCommand());
+  registry.register(createModifyCommand());
   registry.register(createPreviewCommand());
   registry.register(createApplyCommand());
   registry.register(createRevertCommand());

@@ -716,4 +716,128 @@ return module
   ]
 }
 
+## Example: Energy Aura (Persistent)
+
+{
+  "version": "1.0",
+  "effectName": "FlameAura",
+  "rootFolder": "ReplicatedStorage/VFXCopilot/Effects",
+  "summary": "Fiery energy aura with inner glow, rising sparks, and ambient light",
+  "warnings": ["Attach to character HumanoidRootPart for best results"],
+  "operations": [
+    {
+      "op": "ensureFolder",
+      "path": "ReplicatedStorage/VFXCopilot/Effects/FlameAura"
+    },
+    {
+      "op": "createInstance",
+      "id": "innerGlow",
+      "className": "ParticleEmitter",
+      "parentPath": "ReplicatedStorage/VFXCopilot/Effects/FlameAura",
+      "name": "InnerGlow",
+      "properties": {
+        "Texture": "rbxasset://textures/particles/forcefield_glow_main.dds",
+        "Enabled": true,
+        "Rate": 30,
+        "Lifetime": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 1 },
+          { "time": 1, "value": 1.5 }
+        ]},
+        "Speed": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 1 },
+          { "time": 1, "value": 0.5 }
+        ]},
+        "Size": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 2.5 },
+          { "time": 0.5, "value": 3 },
+          { "time": 1, "value": 0 }
+        ]},
+        "Color": { "$type": "ColorSequence", "keypoints": [
+          { "time": 0, "color": { "r": 1, "g": 0.9, "b": 0.5 } },
+          { "time": 0.5, "color": { "r": 1, "g": 0.5, "b": 0.1 } },
+          { "time": 1, "color": { "r": 0.8, "g": 0.2, "b": 0 } }
+        ]},
+        "Transparency": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 0.3 },
+          { "time": 0.7, "value": 0.6 },
+          { "time": 1, "value": 1 }
+        ]},
+        "LightEmission": 1,
+        "LightInfluence": 0,
+        "Brightness": 3,
+        "LockedToPart": true,
+        "Orientation": { "$enum": "Enum.ParticleOrientation.FacingCamera" },
+        "SpreadAngle": { "$type": "Vector2", "x": 15, "y": 15 },
+        "Shape": { "$enum": "Enum.ParticleEmitterShape.Sphere" },
+        "ShapeStyle": { "$enum": "Enum.ParticleEmitterShapeStyle.Volume" },
+        "ZOffset": 1
+      }
+    },
+    {
+      "op": "createInstance",
+      "id": "risingSparks",
+      "className": "ParticleEmitter",
+      "parentPath": "ReplicatedStorage/VFXCopilot/Effects/FlameAura",
+      "name": "RisingSparks",
+      "properties": {
+        "Texture": "rbxasset://textures/particles/sparkles_main.dds",
+        "Enabled": true,
+        "Rate": 40,
+        "Lifetime": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 0.5 },
+          { "time": 1, "value": 1.2 }
+        ]},
+        "Speed": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 4 },
+          { "time": 1, "value": 2 }
+        ]},
+        "Size": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 0.6 },
+          { "time": 0.5, "value": 0.3 },
+          { "time": 1, "value": 0 }
+        ]},
+        "Color": { "$type": "ColorSequence", "keypoints": [
+          { "time": 0, "color": { "r": 1, "g": 1, "b": 0.7 } },
+          { "time": 0.5, "color": { "r": 1, "g": 0.6, "b": 0.1 } },
+          { "time": 1, "color": { "r": 1, "g": 0.3, "b": 0 } }
+        ]},
+        "Transparency": { "$type": "NumberSequence", "keypoints": [
+          { "time": 0, "value": 0 },
+          { "time": 0.8, "value": 0.5 },
+          { "time": 1, "value": 1 }
+        ]},
+        "LightEmission": 1,
+        "LightInfluence": 0,
+        "Brightness": 2,
+        "Drag": 3,
+        "Acceleration": { "$type": "Vector3", "x": 0, "y": 4, "z": 0 },
+        "SpreadAngle": { "$type": "Vector2", "x": 50, "y": 50 },
+        "Shape": { "$enum": "Enum.ParticleEmitterShape.Sphere" },
+        "ShapeInOut": { "$enum": "Enum.ParticleEmitterShapeInOut.Outward" },
+        "Rotation": { "$type": "NumberRange", "min": 0, "max": 360 },
+        "RotSpeed": { "$type": "NumberRange", "min": -180, "max": 180 },
+        "ZOffset": 0
+      }
+    },
+    {
+      "op": "createInstance",
+      "id": "auraLight",
+      "className": "PointLight",
+      "parentPath": "ReplicatedStorage/VFXCopilot/Effects/FlameAura",
+      "name": "AuraLight",
+      "properties": {
+        "Color": { "$type": "Color3", "r": 1, "g": 0.5, "b": 0.1 },
+        "Brightness": 5,
+        "Range": 18
+      }
+    },
+    {
+      "op": "createScript",
+      "scriptType": "ModuleScript",
+      "path": "ReplicatedStorage/VFXCopilot/Effects/FlameAura/EffectController",
+      "source": "local module = {}\\nfunction module.Create(parent)\\n\\tlocal effect = script.Parent:Clone()\\n\\teffect.Parent = parent\\n\\treturn effect\\nend\\nfunction module.Destroy(effect)\\n\\teffect:Destroy()\\nend\\nreturn module"
+    }
+  ]
+}
+
 Output ONLY the JSON patch. No other text.`;

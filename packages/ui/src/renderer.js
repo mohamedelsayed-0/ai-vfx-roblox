@@ -198,6 +198,7 @@ function connect() {
 renderCommands([
   { name: "help", usage: "/help", description: "Show available commands" },
   { name: "generate", usage: "/generate <prompt>", description: "Generate a VFX effect from description" },
+  { name: "modify", usage: "/modify <changes>", description: "Modify the current/last effect" },
   { name: "preview", usage: "/preview", description: "Preview the last generated patch" },
   { name: "apply", usage: "/apply", description: "Apply the current patch to Studio" },
   { name: "revert", usage: "/revert", description: "Undo the last applied patch" },

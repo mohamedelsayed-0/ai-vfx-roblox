@@ -36,6 +36,24 @@ export async function generate(
   return res.json() as Promise<GenerateResponse>;
 }
 
+export async function modify(
+  prompt: string,
+  existingPatch: unknown,
+): Promise<GenerateResponse> {
+  const res = await fetch(`${BACKEND_URL}/modify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, existingPatch }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const detail = (errorData as any).error || res.statusText;
+    throw new Error(`Backend error: ${res.status} ${detail}`);
+  }
+  return res.json() as Promise<GenerateResponse>;
+}
+
 export async function applyPatch(
   patch: unknown,
   checkpointId: string,
